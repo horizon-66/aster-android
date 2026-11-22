@@ -42,3 +42,14 @@ jobs:
         with:
           name: aster-android-debug
           path: android/app/build/outputs/apk/debug/*.apk
+
+      - name: 挂到 Releases（一键下载）
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Aster Android build ${{ github.run_number }}
+          body: 自动构建的调试包，可直接安装。
+          files: android/app/build/outputs/apk/debug/app-debug.apk
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
