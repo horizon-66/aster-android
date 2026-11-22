@@ -1,0 +1,127 @@
+<!doctype html><html lang="zh"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Aster</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:#141418;color:#eee;
+  font:16px/1.7 -apple-system,"PingFang SC",sans-serif;display:flex;flex-direction:column}
+header{padding:22px 22px 6px}
+header h1{margin:0;font-size:19px;font-weight:600}
+header p{margin:8px 0 0;font-size:13px;color:#9a9aa2;line-height:1.8}
+main{padding:18px 22px 24px;display:flex;flex-direction:column;gap:14px}
+.card{background:#1b1b20;border:1px solid #26262d;border-radius:14px;padding:16px}
+.card h2{margin:0 0 4px;font-size:14px;font-weight:600}
+.card p{margin:0 0 12px;font-size:12.5px;color:#9a9aa2;line-height:1.8}
+label{display:block;font-size:12px;color:#9a9aa2;margin:10px 0 6px}
+input{width:100%;height:42px;border-radius:11px;border:1px solid #333;background:#232329;
+  color:#eee;padding:0 12px;font-size:14px;outline:none}
+input:focus{border-color:#e8173d}
+.row{display:flex;gap:10px;margin-top:14px}
+button{flex:1;height:42px;border-radius:11px;border:0;font-size:14px;cursor:pointer}
+.primary{background:#e8173d;color:#fff}
+.ghost{background:none;border:1px solid #333;color:#bbb}
+.state{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#9a9aa2;margin-top:12px}
+.dot{width:8px;height:8px;border-radius:50%;background:#555}
+.dot.on{background:#5aa87a}
+.dot.bad{background:#e8173d}
+.note{font-size:12px;color:#77777f;line-height:1.8;padding:0 4px}
+footer{margin-top:auto;padding:16px 22px 26px;font-size:11.5px;color:#5f5f68;line-height:1.8}
+</style></head><body>
+<header>
+  <h1>连接家里那台电脑</h1>
+  <p>她住在你的电脑上——记忆、性格、日程都在那里。手机只是窗口。</p>
+</header>
+
+<main>
+  <div class="card">
+    <h2>扫码连接</h2>
+    <p>在电脑上打开「设置 → 配对 → 检测私有网络」，用手机相机扫那个二维码，地址会自动填好。</p>
+    <div class="row">
+      <button class="ghost" id="scan">打开相机扫码</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>手动填写</h2>
+    <p>扫码不方便时，把这台电脑的地址和配对令牌填进来。两台设备需在同一私有网络内。</p>
+    <label>电脑地址</label>
+    <input id="base" placeholder="http://100.101.102.103:8777">
+    <label>配对令牌</label>
+    <input id="token" placeholder="设置页「配对」里那一串">
+    <div class="row">
+      <button class="primary" id="go">保存并连接</button>
+    </div>
+    <div class="state"><span class="dot" id="dot"></span><span id="stateText">尚未连接</span></div>
+  </div>
+
+  <div class="card">
+    <h2>离线时也能说话（可选）</h2>
+    <p>留空也可以：电脑关着时只能记事。填了云端密钥，手机不连电脑也能自己回话，用的还是缓存下来的记忆与性格。</p>
+    <label>云端密钥</label>
+    <input id="key" type="password" placeholder="sk-…（只存在这台手机上）">
+    <div class="row"><button class="ghost" id="saveKey">保存密钥</button></div>
+  </div>
+
+  <p class="note">连不上也能用：写下的内容会先存在手机里，回到同一网络后自动上传，并整理成日程与待办。</p>
+</main>
+
+<footer>Aster · 一处数字个体的栖息之所</footer>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const KEY = 'aster.remote';
+
+function paint(state, text) {
+  const d = $('#dot');
+  d.className = 'dot' + (state === 'on' ? ' on' : state === 'bad' ? ' bad' : '');
+  $('#stateText').textContent = text;
+}
+
+async function probe(base, token) {
+  try {
+    const ctl = new AbortController();
+    const to = setTimeout(() => ctl.abort(), 4000);
+    const r = await fetch(base + '/health?t=' + encodeURIComponent(token), { signal: ctl.signal });
+    clearTimeout(to);
+    return r.ok;
+  } catch (e) { return false; }
+}
+
+(async function () {
+  const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+  if (saved && saved.base) {
+    $('#base').value = saved.base;
+    $('#token').value = saved.token || '';
+    paint('', '正在连接…');
+    const ok = await probe(saved.base, saved.token);
+    paint(ok ? 'on' : 'bad', ok ? '已连接' : '电脑没有响应，可继续离线记录');
+  }
+  $('#go').onclick = async () => {
+    const base = ($('#base').value || '').trim().replace(/\/+$/, '');
+    const token = ($('#token').value || '').trim();
+    if (!base) { paint('bad', '请先填写电脑地址'); return; }
+    localStorage.setItem(KEY, JSON.stringify({ base, token }));
+    paint('', '正在连接…');
+    const ok = await probe(base, token);
+    if (ok) {
+      paint('on', '已连接');
+      location.href = base + '/m?t=' + encodeURIComponent(token);
+    } else {
+      paint('bad', '连不上：确认电脑开着、装了私有网络客户端并登录了同一账号');
+    }
+  };
+  const savedKey = localStorage.getItem('aster.key') || '';
+  if (savedKey) $('#key').value = savedKey;
+  $('#saveKey').onclick = () => {
+    const k = ($('#key').value || '').trim();
+    if (k) localStorage.setItem('aster.key', k); else localStorage.removeItem('aster.key');
+    paint('', k ? '密钥已保存，离线时可用于生成回复' : '已清除密钥，离线时只能记事');
+  };
+  $('#scan').onclick = () => {
+    paint('', '扫码需要相机权限；扫码后地址会自动填入上方输入框');
+  };
+})();
+</script>
+</body></html>
