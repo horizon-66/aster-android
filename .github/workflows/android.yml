@@ -5,7 +5,10 @@ on:
   push:
     branches: [ main ]
     paths:
-      - "mobile-native/**"
+      - "www/**"
+      - "android/**"
+      - "capacitor.config.json"
+      - "package.json"
       - ".github/workflows/android.yml"
 
 jobs:
@@ -24,13 +27,12 @@ jobs:
           java-version: "21"
 
       - name: 安装依赖并同步 Capacitor
-        working-directory: mobile-native
         run: |
           npm ci || npm install
           npx cap sync android
 
       - name: 打 debug 包
-        working-directory: mobile-native/android
+        working-directory: android
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
@@ -39,4 +41,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: aster-android-debug
-          path: mobile-native/android/app/build/outputs/apk/debug/*.apk
+          path: android/app/build/outputs/apk/debug/*.apk
