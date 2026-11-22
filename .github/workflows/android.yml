@@ -11,6 +11,9 @@ on:
       - "package.json"
       - ".github/workflows/android.yml"
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
