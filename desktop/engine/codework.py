@@ -250,13 +250,13 @@ def _normalize_seats(seats: list) -> list:
     return out
 
 
-def start_job(task: str, seats: list, rounds: int = 3, budget: float = 0.0) -> dict:
+def start_job(task: str, seats: list, rounds: int = 3, budget: float = 0.0, origin: str = "") -> dict:
     jid = uuid.uuid4().hex[:10]
     seats = _normalize_seats(seats)
     job = {"id": jid, "task": task, "seats": seats, "rounds": max(1, min(5, int(rounds or 3))),
            "state": "running", "steps": [], "notes": [], "stop": False, "t0": time.time(),
            "tokens": {"in": 0, "out": 0}, "cost": 0.0, "files": [], "snaps": [],
-           "budget": float(budget or 0)}
+           "budget": float(budget or 0), "from": str(origin or "")}
     JOBS[jid] = job
     _save(job)
 

@@ -113,6 +113,10 @@ def touch(text: str, apply: bool = True) -> dict:
     new_key = cur_key
     if new >= 100:
         new_key = "own"
+        if delta > 0:
+            # 到顶之后分数不再涨，改记「时刻」：亲密不是一个数字，是一串具体的事
+            d["moments"] = int(d.get("moments") or 0) + 1
+            d["last_moment"] = int(time.time())
     elif new > old:
         cand = tier_of(new)
         # 升档要高出上界 3 分，避免边界上反复抖
@@ -278,6 +282,8 @@ def state() -> dict:
     key, name = tier_of(d.get("intimacy") or 0)
     return {"ok": True, "intimacy": round(float(d.get("intimacy") or 0), 1),
             "tier": key, "tier_name": name,
+            "moments": int(d.get("moments") or 0),
+            "at_top": float(d.get("intimacy") or 0) >= 100,
             "evidence": (d.get("evidence") or [])[-8:],
             "history": (d.get("history") or [])[-6:]}
 

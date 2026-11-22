@@ -369,6 +369,8 @@ def db_remember(text: str, tag: str = "对话", src: str = "dialogue:user",
 
 
 def remember_turn(text: str, cls: dict) -> dict:
+    if _DRY:
+        return {}
     """聊天里的一句话，够格就进库。
 
     2026-11-22 他定的：亲密的话和情绪高涨时的场景也要记住——那不是废话，是日子。
@@ -429,11 +431,13 @@ def _recall_old_db(keywords: list, limit: int = 5) -> list:
                 continue
             rows = c.execute(
                 "select text from items where text like ? and text like '他说的：%' "
-                "order by rowid desc limit ?", ("%" + k + "%", limit)).fetchall()
+                "and coalesce(fragment,0) < 2 order by rowid desc limit ?",
+                ("%" + k + "%", limit)).fetchall()
             if not rows:
                 rows = c.execute(
                     "select text from items where text like ? and text not like '%我说：%' "
-                    "order by rowid desc limit ?", ("%" + k + "%", limit)).fetchall()
+                    "and coalesce(fragment,0) < 2 order by rowid desc limit ?",
+                    ("%" + k + "%", limit)).fetchall()
             for r in rows:
                 _raw = r[0] or ""
                 if "我说：" in _raw:      # 我说的话不算「他记得的事」
@@ -531,6 +535,170 @@ def _kw_weight(k: str) -> float:
 
 def _score(text: str, keywords: list) -> float:
     return sum(_kw_weight(k) for k in (keywords or []) if k and k in (text or ""))
+
+
+# ── 记忆的衰减与遗忘 ─────────────────────────────────────────────
+# 旧的先变模糊、再算忘掉；提起来一次就回一点。永远不硬删：原件都在库里。
+# 身份、关系、忌讳这类是骨架，半衰期给得很长，基本不掉。
+_DECAY_HALF = {
+    "身份": 3650, "关系": 1460, "忌讳": 1460, "偏好": 1095,
+    "项目": 730, "事件": 365, "细节": 240,
+}
+_DECAY_DEFAULT = 200          # 普通对话：两百天掉一半
+_DECAY_FADE = 0.20            # 低于这个 → 模糊
+_DECAY_GONE = 0.06            # 低于这个 → 算忘掉
+
+
+def _strength(row, now: int) -> float:
+    """一个记忆还剩多少力气：年龄衰减 × 被提起带来的加固。"""
+    tag = row["tag"] or ""
+    half = _DECAY_HALF.get(tag, _DECAY_DEFAULT)
+    age = max(0.0, (now - int(row["created"] or now)) / 86400.0)
+    s = 0.5 ** (age / half)
+    hits = int(row["hits"] or 0)
+    if hits:
+        since = max(0.0, (now - int(row["last_hit"] or 0)) / 86400.0)
+        # 提起过、而且不久前还提过：加固最多 2 倍，但也会慢慢退
+        s *= 1.0 + min(1.0, hits / 6.0) * (0.5 ** (since / 90.0))
+    boost = float(row["boost"] or 1.0)
+    return max(0.0, s * boost)
+
+
+# ── 画像的事实表 ───────────────────────────────────────────────
+# 画像（profile.json）是云里攒出来的散文，适合放进提示词；
+# facts 是硬事实，用来回答「我叫什么」「我住哪」这种不能糊的问题。
+_FACT_RULES = [
+    ("名字", r"(?:我叫|我的名字叫|名字是)([\u4e00-\u9fa5A-Za-z]{1,8})"),
+    ("住处", r"(?:我住在|我住|我在)([\u4e00-\u9fa5]{2,8})(?:市|住|生活|上班)?(?=[，。！？,.!?]|$)"),
+    ("单位", r"(?:我在|在)([\u4e00-\u9fa5A-Za-z0-9]{2,12})(?:上班|工作|公司)"),
+    ("职业", r"我是(?:一[个名])?(?:做)?([\u4e00-\u9fa5]{2,10})(?:的|工作)"),
+    ("偏好", r"我喜欢([\u4e00-\u9fa5A-Za-z0-9]{1,14})"),
+    ("忌讳", r"我(?:讨厌|不喜欢|受不了)([\u4e00-\u9fa5A-Za-z0-9]{1,14})"),
+]
+_FACT_REL = [("妈", ["我妈", "母亲"]), ("爸", ["我爸", "父亲"]),
+             ("猫", ["我的猫", "我家猫", "我养的猫"]), ("狗", ["我的狗", "我家狗", "我养的狗"])]
+
+
+def facts_upsert(subject: str, attr: str, value: str, conf: float = 0.7,
+                 src: str = "chat", subject_type: str = "self", relation: str = "") -> None:
+    value = (value or "").strip()
+    if not value:
+        return
+    try:
+        import sqlite3
+        c = sqlite3.connect(DB_FILE, timeout=5)
+        c.execute("""insert into facts(subject, attr, value, ts, conf, src, subject_type, relation)
+                     values(?,?,?,?,?,?,?,?)
+                     on conflict(subject, attr) do update set
+                       value=excluded.value, ts=excluded.ts,
+                       conf=max(facts.conf, excluded.conf), src=excluded.src""",
+                  (subject, attr, value[:40], int(time.time()), conf, src, subject_type, relation))
+        c.commit()
+        c.close()
+    except Exception:
+        pass
+
+
+def facts_extract(text: str) -> int:
+    """从一句话里捡硬事实。宁可少记，也别记错。"""
+    if not text or len(text) > 300:
+        return 0
+    n = 0
+    for attr, pat in _FACT_RULES:
+        m = re.search(pat, text)
+        if m:
+            val = m.group(1).strip()
+            if 1 <= len(val) <= 20 and not re.search(r"(哪|什么|谁|吗|呢|怎么|多少)", val) \
+                    and val not in ("这个", "那个", "一下", "这边", "那边"):
+                facts_upsert("我", attr, val, 0.65 if attr in ("偏好", "忌讳") else 0.8)
+                n += 1
+    for who, keys in _FACT_REL:
+        for k in keys:
+            if k in text:
+                facts_upsert(who, "关系", "他提起过", 0.6, "chat", "relational", who)
+                n += 1
+                break
+    return n
+
+
+def facts_all(limit: int = 100) -> list:
+    try:
+        import sqlite3
+        c = sqlite3.connect(DB_FILE, timeout=5)
+        rows = c.execute("select subject, attr, value, conf, ts from facts "
+                         "order by ts desc limit ?", (limit,)).fetchall()
+        c.close()
+        return [{"subject": r[0], "attr": r[1], "value": r[2],
+                 "conf": r[3], "ts": r[4]} for r in rows]
+    except Exception:
+        return []
+
+
+def facts_line(limit: int = 8) -> str:
+    """塞进提示词的一行硬事实。"""
+    try:
+        import sqlite3
+        c = sqlite3.connect(DB_FILE, timeout=5)
+        rows = c.execute("select subject, attr, value from facts where conf >= 0.6 "
+                         "order by ts desc limit ?", (limit,)).fetchall()
+        c.close()
+    except Exception:
+        return ""
+    if not rows:
+        return ""
+    parts = []
+    for subj, attr, val in rows:
+        if subj == "我":
+            parts.append("他的%s是%s" % (attr, val))
+        elif attr == "关系":
+            parts.append("他家有%s" % subj)
+        else:
+            parts.append("%s：%s" % (subj, val))
+    return "已知事实：" + "；".join(parts) + "。"
+
+
+def decay(dry: bool = True) -> dict:
+    """把记忆按年龄与提及情况重新分级。dry=True 只算不改。"""
+    import sqlite3
+    now = int(time.time())
+    c = sqlite3.connect(DB_FILE, timeout=10)
+    c.row_factory = sqlite3.Row
+    rows = c.execute("select id, tag, created, hits, last_hit, boost, fragment from items").fetchall()
+    fade, gone, keep = [], [], 0
+    for r in rows:
+        st = _strength(r, now)
+        want = 2 if st < _DECAY_GONE else (1 if st < _DECAY_FADE else 0)
+        cur = int(r["fragment"] or 0)
+        if want > cur:
+            (gone if want == 2 else fade).append(r["id"])
+        else:
+            keep += 1
+    if not dry:
+        for ids, lvl in ((fade, 1), (gone, 2)):
+            for i in range(0, len(ids), 500):
+                chunk = ids[i:i + 500]
+                c.executemany("update items set fragment=? where id=?",
+                              [(lvl, x) for x in chunk])
+        c.commit()
+    c.close()
+    return {"ok": True, "dry": bool(dry), "total": len(rows),
+            "fade": len(fade), "gone": len(gone), "keep": keep}
+
+
+def _touch_recalled(texts: list) -> None:
+    """想起来的记忆会被加固：提一次，衰减就慢一点。"""
+    if not texts:
+        return
+    try:
+        import sqlite3
+        c = sqlite3.connect(DB_FILE, timeout=5)
+        now = int(time.time())
+        for t in texts:
+            c.execute("update items set hits=coalesce(hits,0)+1, last_hit=? where text=?", (now, t))
+        c.commit()
+        c.close()
+    except Exception:
+        pass
 
 
 def recall(keywords: list, limit: int = 5) -> list:
@@ -671,6 +839,8 @@ TASK_FILE = os.path.join(HOME, "tasks_new.json")
 
 
 def chat_log(append: dict = None, limit: int = 200) -> list:
+    if append is not None and _DRY:      # 自检这类调用不许往真实聊天记录里写
+        append = None
     """对话落盘：memory/chat.ndjson，一行一条，读的时候取最近 limit 条。"""
     p2 = os.path.join(HOME, "chat.ndjson")
     if append:
@@ -2198,6 +2368,8 @@ def mood_now() -> str:
 
 
 def feel(text: str) -> None:
+    if _DRY:
+        return
     """他说的话会带动情绪：被夸、被凶、被关心，都记一笔。"""
     try:
         if _endo and hasattr(_endo, "touch"):
@@ -2896,162 +3068,327 @@ def persona_text() -> str:
         return open(os.path.join(HOME, "persona.md"), encoding="utf-8").read()[:1200]
     except Exception:
         return ""
-MOBILE_HTML = """<!doctype html><meta charset=utf-8>
-<meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name=apple-mobile-web-app-capable content=yes>
+MOBILE_HTML = r"""<!doctype html><html lang="zh-CN"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="theme-color" content="#f6f5f3">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>Aster</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <style>
-*{box-sizing:border-box}body{margin:0;height:100vh;display:flex;flex-direction:column;
- background:#141418;color:#eee;font:16px/1.6 -apple-system,PingFang SC}
-header{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#1b1b20;
- border-bottom:1px solid #26262d}
-header img{width:38px;height:38px;border-radius:50%;object-fit:cover;background:#333}
-header .nm{font-size:15px;font-weight:600}
-header .st{font-size:12px;color:#9a9aa2}
-header .btn{margin-left:auto;background:none;border:1px solid #333;color:#bbb;border-radius:9px;
- padding:5px 10px;font-size:12px}
-#log{flex:1;overflow:auto;padding:14px}
-.b{margin:8px 0;padding:9px 13px;border-radius:14px;max-width:82%;white-space:pre-wrap}
-.me{background:#2a2a32;margin-left:auto}
-.her{background:#3a1d25}
-#in{display:flex;gap:8px;padding:10px;background:#1b1b20;border-top:1px solid #26262d}
-input{flex:1;padding:11px;border-radius:12px;border:1px solid #333;background:#232329;color:#eee;font-size:16px}
-button.send{padding:0 18px;border-radius:12px;border:0;background:#e8173d;color:#fff;font-size:16px}
-#drawer{position:fixed;inset:0;background:rgba(10,10,12,.6);display:none}
-#drawer.on{display:block}
-#drawer .box{position:absolute;right:0;top:0;bottom:0;width:82%;background:#1b1b20;padding:16px;overflow:auto}
-#drawer h3{font-size:14px;margin:16px 0 6px;color:#e8173d}
-#drawer div.it{font-size:13px;color:#bbb;padding:4px 0;border-bottom:1px solid #26262d}
-</style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --white:#FFFFFF;--shell:#FBFBFC;--ink:#0A0A0B;--ink-2:#6E6E73;--ink-3:#A9A9AF;
+  --hair:#ECECF0;--pink:#FF2D55;
+  --sans:"SF Pro Text",-apple-system,"PingFang SC",system-ui,sans-serif;
+}
+html,body{height:100%;height:100dvh;margin:0}
+body{display:flex;flex-direction:column;background:var(--white);color:var(--ink);
+  font-family:var(--sans);-webkit-font-smoothing:antialiased;padding-top:env(safe-area-inset-top)}
+/* 顶栏：无底色，只有一条极细的分隔 */
+header{flex:0 0 auto;display:flex;align-items:center;gap:10px;height:54px;padding:0 12px 0 6px;
+  border-bottom:1px solid var(--hair);background:rgba(255,255,255,.9);backdrop-filter:blur(18px)}
+#menu{width:40px;height:40px;border:0;background:none;color:var(--ink-2);display:grid;place-items:center}
+#menu svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round}
+.who{min-width:0;flex:1}
+.who b{display:block;font-size:15px;font-weight:600;letter-spacing:-.01em}
+.who span{display:block;font-size:12px;color:var(--ink-3);margin-top:1px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:56vw}
+#net{width:6px;height:6px;border-radius:50%;background:var(--ink-3);margin-right:10px}
+#net.on{background:var(--pink)}
+/* 主体 */
+main{flex:1;min-height:0;display:flex;flex-direction:column}
+.pane{flex:1;min-height:0;display:none;flex-direction:column}
+.pane.on{display:flex}
+/* 对话：没有气泡，只有文字与留白 */
+#log{flex:1;overflow:auto;padding:10px 22px 6px;-webkit-overflow-scrolling:touch}
+.day{display:flex;align-items:center;gap:12px;margin:26px 0 22px;font-size:11px;color:var(--ink-3)}
+.day::before,.day::after{content:"";flex:1;height:1px;background:var(--hair)}
+.turn{margin:0 0 20px;max-width:86%}
+.turn p{margin:0;font-size:15px;line-height:1.78;white-space:pre-wrap;word-break:break-word}
+.turn.me{margin-left:auto;text-align:right}
+.turn.me p{color:var(--ink-2)}
+.turn.sys{max-width:none;text-align:center;margin:10px 0 14px}
+.turn.sys p{font-size:12px;color:var(--ink-3)}
+.turn .at{display:block;margin-top:6px;font-size:11px;color:#C4C4C9}
+/* 输入 */
+footer{flex:0 0 auto;padding:8px 16px calc(12px + env(safe-area-inset-bottom));
+  background:rgba(255,255,255,.94);backdrop-filter:blur(18px);border-top:1px solid var(--hair)}
+.field{display:flex;align-items:center;gap:6px;background:#F7F7F9;border-radius:22px;
+  padding:4px 6px 4px 16px}
+.field input{flex:1;min-width:0;height:38px;border:0;background:none;outline:none;
+  font-family:var(--sans);font-size:15px;color:var(--ink)}
+.field input::placeholder{color:var(--ink-3)}
+#assign{width:30px;height:30px;border:0;background:none;color:var(--ink-3);font-size:18px;line-height:1}
+#send2{flex:0 0 30px;width:30px;height:30px;border-radius:50%;border:0;background:var(--ink);color:#fff;
+  display:grid;place-items:center;font-size:14px}
+#send2:active{opacity:.7}
+/* 列表页 */
+.list{flex:1;overflow:auto;padding:22px 22px calc(28px + env(safe-area-inset-bottom))}
+.h{font-size:12px;font-weight:600;color:var(--ink-3);margin:24px 0 4px}
+.h:first-child{margin-top:0}
+.item{padding:14px 0;border-bottom:1px solid var(--hair)}
+.item .t1{font-size:15px;line-height:1.6}
+.item .t2{font-size:12px;color:var(--ink-3);margin-top:3px}
+.empty{font-size:13.5px;color:var(--ink-3);padding:6px 0 14px;line-height:1.8}
+.addbtn{width:100%;height:46px;border-radius:0;border:0;border-bottom:1px solid var(--hair);
+  background:none;color:var(--ink);font-size:14px;text-align:left;padding:0 2px;margin-top:8px}
+/* 侧边栏 */
+#side{position:fixed;inset:0;background:rgba(10,10,11,.18);display:none;z-index:30}
+#side.on{display:block}
+#side .panel{position:absolute;left:0;top:0;bottom:0;width:78%;max-width:320px;background:#fff;
+  padding:calc(24px + env(safe-area-inset-top)) 0 calc(20px + env(safe-area-inset-bottom));
+  box-shadow:1px 0 0 var(--hair);overflow:auto}
+#side .top{display:flex;align-items:center;gap:12px;padding:0 22px 20px;border-bottom:1px solid var(--hair)}
+#side .top img,#side .top .ph{width:38px;height:38px;border-radius:50%;object-fit:cover;background:#F2F2F5;
+  display:grid;place-items:center;font-size:16px;color:var(--pink)}
+#side .top b{display:block;font-size:15px;font-weight:600}
+#side .top span{display:block;font-size:12px;color:var(--ink-3);margin-top:2px}
+#side a{display:flex;align-items:center;gap:14px;height:48px;padding:0 22px;color:var(--ink);
+  font-size:14.5px;text-decoration:none}
+#side a svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+#side a.on{color:var(--pink)}
+#side a.on svg{stroke:var(--pink)}
+</style></head><body>
+
 <header>
-  <img id=fc src=""><div><div class=nm id=nm>Aster</div><div class=st id=st></div></div>
-  <button class=btn onclick="document.getElementById('drawer').classList.add('on')">更多</button>
+ <button id="menu" aria-label="菜单"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+ <div class="who"><b id="nm">Aster</b><span id="st">正在连上你的电脑…</span></div>
+ <div id="net" title="离线"></div>
 </header>
-<div id=log></div>
-<div id=in><input id=t placeholder="说点什么"><button class=send onclick=send()>发</button></div>
-<div id=drawer onclick="if(event.target.id==='drawer')this.classList.remove('on')">
- <div class=box><h3>最近记得的</h3><div id=mem>读不到</div>
- <h3>她在做什么</h3><div id=tk>没有任务</div></div>
+ <div class="dot" id="net" title="离线"></div>
 </div>
+
+<main>
+ <section class="pane on" id="pane-chat">
+  <div id="log"></div>
+  <footer>
+   <div class="field">
+     <input id="t" placeholder="说点什么" autocomplete="off">
+     <button id="assign" title="交给她在电脑上做">＋</button>
+     <button id="send2" aria-label="发送">↑</button>
+   </div>
+  </footer>
+ </section>
+
+ <section class="pane" id="pane-trips">
+  <div class="list" id="tripList"><div class="empty">还没有安排</div></div>
+ </section>
+
+ <section class="pane" id="pane-mem">
+  <div class="list" id="memList"><div class="empty">还没有记下什么</div></div>
+ </section>
+
+ <section class="pane" id="pane-me">
+  <div class="list" id="meList"></div>
+ </section>
+</main>
+
+<div id="side">
+ <div class="panel">
+   <div class="top">
+     <img id="av2" src="" alt="" style="display:none">
+     <div class="ph" id="avph">A</div>
+     <div><b id="nm2">Aster</b><span id="st2"></span></div>
+   </div>
+   <a data-p="chat" class="on"><svg viewBox="0 0 24 24"><path d="M20.5 11.6c0 4-3.8 7.2-8.5 7.2-1 0-2-.14-2.9-.4l-4.6 1.6 1.5-3.7C4.4 14.9 3.5 13.3 3.5 11.6c0-4 3.8-7.2 8.5-7.2s8.5 3.2 8.5 7.2z"/></svg>对话</a>
+   <a data-p="trips"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg>日程</a>
+   <a data-p="mem"><svg viewBox="0 0 24 24"><path d="M5 4.5h9.5A2.5 2.5 0 0 1 17 7v13H7.5A2.5 2.5 0 0 1 5 17.5z"/><path d="M17 7h1.5A1.5 1.5 0 0 1 20 8.5V20h-3"/></svg>记忆</a>
+   <a data-p="me"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20.5c1.6-3.6 4.2-5.4 7.5-5.4s5.9 1.8 7.5 5.4"/></svg>我</a>
+ </div>
+</div>
+
 <script>
-const T=new URLSearchParams(location.search).get('t')||'';
-function add(s,w){const d=document.createElement('div');d.className='b '+w;d.textContent=s;
- const L=document.getElementById('log');L.appendChild(d);L.scrollTop=L.scrollHeight;}
-function snGet(){try{return JSON.parse(localStorage.getItem('aster.snap')||'null')}catch(e){return null}}
+const T = new URLSearchParams(location.search).get('t') || '';
+const $ = (s) => document.querySelector(s);
+const api = (u, o) => fetch(u, Object.assign({headers: {'X-Pair': T, 'Content-Type': 'application/json'}}, o || {}));
+
+/* ---------- 对话 ---------- */
+function add(text, who){
+  const wrap = document.createElement('div');
+  wrap.className = 'turn ' + (who === 'me' ? 'me' : who === 'sys' ? 'sys' : 'her');
+  const p = document.createElement('p'); p.textContent = text;
+  wrap.appendChild(p);
+  const L = $('#log'); L.appendChild(wrap); L.scrollTop = L.scrollHeight;
+}
+function snGet(){ try { return JSON.parse(localStorage.getItem('aster.snap') || 'null'); } catch(e){ return null; } }
 async function snapshot(){
- try{const r=await fetch('/sync/snapshot');const d=await r.json();
-  if(d&&d.ok){localStorage.setItem('aster.snap',JSON.stringify(d));}}catch(e){}
+  try { const r = await api('/sync/snapshot'); const d = await r.json();
+    if (d && d.ok) localStorage.setItem('aster.snap', JSON.stringify(d)); } catch(e){}
 }
-function topMems(q,n){
- const snap=snGet();if(!snap)return [];
- const mems=(snap.memories||[]);
- const chars=(q||'').replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g,'');
- const grams=[];for(let i=0;i<chars.length-1;i++)grams.push(chars.slice(i,i+2));
- const df={};grams.forEach(function(g){df[g]=0;});
- mems.forEach(function(m){const t=String(m.text||'');grams.forEach(function(g){if(t.indexOf(g)>=0)df[g]++;});});
- const scored=mems.map(function(m){const t=String(m.text||'');let sc=0;
-   grams.forEach(function(g){if(t.indexOf(g)>=0)sc+=1/(1+df[g]);});return {t:t,sc:sc};});
- scored.sort(function(a,b){return b.sc-a.sc;});
- return scored.slice(0,n).filter(function(x){return x.sc>0;}).map(function(x){return x.t;});
-}
-async function cloudReply(q){
- const key=localStorage.getItem('aster.key')||'';
- if(!key)return '';
- const snap=snGet()||{};
- const nm=(snap.identity&&snap.identity.assistant)||'她';
- const rel=(snap.relation&&snap.relation.tier_name)||'';
- const sys='你是'+nm+'。'+(snap.persona||'')+
-  '\n你们的关系：'+rel+'。'+
-  (topMems(q,8).length?('\n你记得他说过：\n'+topMems(q,8).map(function(t){return '· '+t;}).join('\n')):'')+
-  '\n短句、口语，一次一两句；不列点；不解释自己是 AI。';
- try{
-  const r=await fetch('https://api.deepseek.com/v1/chat/completions',{method:'POST',
-   headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
-   body:JSON.stringify({model:'deepseek-chat',messages:[{role:'system',content:sys},
-     {role:'user',content:q}],max_tokens:120,temperature:0.8})});
-  const d=await r.json();
-  return String((d.choices&&d.choices[0]&&d.choices[0].message&&d.choices[0].message.content)||'').trim();
- }catch(e){return '';}
+function grams(q){ const c=(q||'').replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g,''); const g=[];
+  for(let i=0;i<c.length-1;i++) g.push(c.slice(i,i+2)); return g; }
+function topMems(q, n){
+  const snap = snGet(); if (!snap) return [];
+  const mems = snap.memories || [], gs = grams(q), df = {};
+  gs.forEach(g => df[g] = 0);
+  mems.forEach(m => { const t=String(m.text||''); gs.forEach(g=>{ if(t.indexOf(g)>=0) df[g]++; }); });
+  const scored = mems.map(m => { const t=String(m.text||''); let s=0;
+    gs.forEach(g=>{ if(t.indexOf(g)>=0) s += 1/(1+df[g]); }); return {t, s}; });
+  scored.sort((a,b)=>b.s-a.s);
+  return scored.slice(0,n).filter(x=>x.s>0).map(x=>x.t);
 }
 function offlineReply(q){
- const snap=snGet();
- if(!snap)return '现在连不上家里那台电脑，先记下了，回去再说。';
- const mems=(snap.memories||[]);
- const chars=(q||'').replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g,'');
- const grams=[];for(let i=0;i<chars.length-1;i++)grams.push(chars.slice(i,i+2));
- // 越稀有的词越值钱：「周舟」只有几条，「怎么」满地都是
- const df={};grams.forEach(function(g){df[g]=0;});
- mems.forEach(function(m){const t=String(m.text||'');grams.forEach(function(g){if(t.indexOf(g)>=0)df[g]++;});});
- let best=null,bestScore=0;
- mems.forEach(function(m){
-   const t=String(m.text||'');let sc=0;
-   grams.forEach(function(g){if(t.indexOf(g)>=0)sc+=1/(1+df[g]);});
-   if(sc>bestScore){bestScore=sc;best=m;}
- });
- if(best&&bestScore>=0.12){
-   const txt=String(best.text||'').replace(/^他说的：/,'').replace(/^我说：/,'');
-   return '我记得你说过：'+txt.slice(0,60);
- }
- return '现在连不上家里那台电脑，先记下了，回去再说。';
+  const top = topMems(q, 1);
+  if (top.length) return '我记得你说过：' + top[0].replace(/^他说的：/,'').replace(/^我说：/,'').slice(0,60);
+  return '现在连不上家里那台电脑，先记下了，回去再说。';
 }
-async function boot(){
- try{const h=await (await fetch('/history')).json();
-  const its=(h.items||[]).slice(-30);
-  const L=document.getElementById('log');
-  if(!L.dataset.filled&&its.length){L.innerHTML='';L.dataset.filled='1';
-   its.forEach(function(m){const d=document.createElement('div');
-    d.className='b '+(m.who==='me'?'me':'her');d.textContent=m.text||'';L.appendChild(d);});
-   L.scrollTop=L.scrollHeight;}}catch(e){}
-
- try{const id=await (await fetch('/identity')).json();
-  document.getElementById('nm').textContent=id.assistant||'未命名';}catch(e){}
- try{const f=await (await fetch('/face')).json();
-  if(f.path)document.getElementById('fc').src='/img?f='+encodeURIComponent(f.path);
-  document.getElementById('st').textContent=f.mood||'';}catch(e){}
- try{const m=await (await fetch('/mood')).json();
-  document.getElementById('st').textContent=m.mood||document.getElementById('st').textContent;}catch(e){}
- try{const d=await (await fetch('/memory')).json();
-  const box=document.getElementById('mem');const its=(d.items||[]).slice(-20).reverse();
-  box.innerHTML=its.length?its.map(x=>'<div class=it>'+x.text+'</div>').join(''):'还没有';}catch(e){}
- try{const d=await (await fetch('/task/list')).json();
-  const box=document.getElementById('tk');const its=(d.items||[]).slice(-6).reverse();
-  box.innerHTML=its.length?its.map(x=>'<div class=it>'+x.goal+' · '+x.status+'</div>').join(''):'没有任务';}catch(e){}
+async function cloudReply(q){
+  const key = localStorage.getItem('aster.key') || ''; if (!key) return '';
+  const snap = snGet() || {};
+  const sys = '你是' + ((snap.identity && snap.identity.assistant) || '她') + '。' + (snap.persona || '') +
+    '\n你们的关系：' + ((snap.relation && snap.relation.tier_name) || '') + '。' +
+    (topMems(q,8).length ? ('\n你记得他说过：\n' + topMems(q,8).map(t=>'· '+t).join('\n')) : '') +
+    '\n短句、口语，一次一两句；不列点；不解释自己是 AI。';
+  try {
+    const r = await fetch('https://api.deepseek.com/v1/chat/completions', {method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+      body: JSON.stringify({model:'deepseek-chat', messages:[{role:'system',content:sys},{role:'user',content:q}],
+        max_tokens:120, temperature:0.8})});
+    const d = await r.json();
+    return String((d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || '').trim();
+  } catch(e){ return ''; }
 }
-function qget(){try{return JSON.parse(localStorage.getItem('aster.queue')||'[]')}catch(e){return []}}
-function qset(a){try{localStorage.setItem('aster.queue',JSON.stringify(a.slice(-200)))}catch(e){}}
-function qadd(t){const a=qget();a.push({ts:Math.floor(Date.now()/1000),text:t,kind:'chat'});qset(a);
- add('已暂存，联网后自动上传','sys');}
+function qget(){ try { return JSON.parse(localStorage.getItem('aster.queue') || '[]'); } catch(e){ return []; } }
+function qset(a){ try { localStorage.setItem('aster.queue', JSON.stringify(a.slice(-200))); } catch(e){} }
+function qadd(t){ const a=qget(); a.push({ts:Math.floor(Date.now()/1000), text:t, kind:'chat'}); qset(a);
+  add('已暂存，联网后自动上传', 'sys'); book(); }
 async function flush(){
- const a=qget();if(!a.length)return;
- try{
-  const r=await fetch('/sync/ingest',{method:'POST',headers:{'Content-Type':'application/json','X-Pair':T},
-   body:JSON.stringify({items:a})});
-  if(!r.ok)return;
-  const d=await r.json();
-  if(d&&d.ok){qset([]);
-   const n=(d.trips||[]).length;
-   add('已上传 '+(a.length)+' 条'+(n?('，其中 '+n+' 条记进了日程'):''),'sys');}
- }catch(e){}
+  const a = qget(); if (!a.length) return;
+  try {
+    const r = await api('/sync/ingest', {method:'POST', body: JSON.stringify({items: a})});
+    if (!r.ok) return;
+    const d = await r.json();
+    if (d && d.ok) { qset([]); add('已上传 ' + a.length + ' 条', 'sys'); book(); }
+  } catch(e){}
 }
-async function send(){const i=document.getElementById('t');const v=i.value.trim();if(!v)return;i.value='';
- add(v,'me');
- let d=null;
- try{
-  const r=await fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json','X-Pair':T},
-   body:JSON.stringify({text:v})});
-  d=await r.json();
- }catch(e){
-  let _t='';
-  try{ _t=await cloudReply(v); }catch(e){}
-  add(_t||offlineReply(v),'her');
-  qadd(v); boot(); return;
- }
- const L=document.getElementById('log');
- add(d&&d.reply?d.reply:'…','her');boot();flush();}
-document.getElementById('t').addEventListener('keydown',e=>{if(e.key==='Enter')send();});
-boot();snapshot();
-setInterval(function(){flush();},20000);
-</script>"""
+async function send(){
+  const i = $('#t'), v = (i.value || '').trim(); if (!v) return;
+  i.value = ''; add(v, 'me');
+  try {
+    const r = await api('/chat', {method:'POST', body: JSON.stringify({text: v, channel: 'phone'})});
+    const d = await r.json();
+    if (d && d.ok) { add(d.reply || '…', 'her'); book(); }
+    else throw new Error('bad');
+  } catch(e) {
+    let t = ''; try { t = await cloudReply(v); } catch(_){}
+    add(t || offlineReply(v), 'her'); qadd(v); boot();
+  }
+}
+$('#send2').onclick = send;
+$('#t').addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
+$('#assign').onclick = async () => {
+  const v = ($('#t').value || '').trim();
+  if (!v) { add('先在输入框里写下要她做什么', 'sys'); return; }
+  const r = await api('/task/add', {method:'POST', body: JSON.stringify({goal: v})}).then(x=>x.json()).catch(()=>null);
+  if (r && r.ok) { $('#t').value=''; add('已交给她，在电脑的工作台上做：' + v, 'sys'); book(); }
+  else add('没交上，稍后再试', 'sys');
+};
+
+/* ---------- 面板 ---------- */
+let P = 'chat';
+function openSide(open){ $('#side').classList.toggle('on', open !== false); }
+$('#menu').onclick = () => openSide();
+$('#side').addEventListener('click', (e) => { if (e.target.id === 'side') openSide(false); });
+document.querySelectorAll('#side a[data-p]').forEach(a => a.onclick = () => {
+  P = a.dataset.p;
+  document.querySelectorAll('#side a[data-p]').forEach(x => x.classList.toggle('on', x === a));
+  document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === 'pane-' + P));
+  openSide(false);
+  if (P === 'trips') trips();
+  if (P === 'mem') mems();
+  if (P === 'me') me();
+});
+async function trips(){
+  const d = await api('/trips').then(x=>x.json()).catch(()=>null);
+  const its = (d && d.items || []).filter(x => !x.ended);
+  $('#tripList').innerHTML = (its.length ? its.map(x =>
+      '<div class="item"><div class="t1">' + (x.what || '') + '</div><div class="t2">' + (x.when || '') + '</div></div>').join('')
+    : '<div class="empty">还没有安排</div>')
+    + '<button class="addbtn" id="addTrip">＋ 记一条日程</button>';
+  const b = $('#addTrip'); if (!b) return;
+  b.onclick = async () => {
+    const when = prompt('时间，例如 明天 15:00'); if (!when) return;
+    const what = prompt('内容，例如 与设计组开会'); if (!what) return;
+    const r = await api('/trip/add', {method:'POST', body: JSON.stringify({what, when})}).then(x=>x.json()).catch(()=>null);
+    if (r && r.ok) trips(); else alert('没记上：' + ((r && r.error) || ''));
+  };
+}
+async function mems(){
+  const d = await api('/memory').then(x=>x.json()).catch(()=>null);
+  const its = (d && d.items || []).slice(0, 60);
+  $('#memList').innerHTML = its.length ? its.map(x =>
+    '<div class="item"><div class="t1">' + (x.text || '') + '</div>' +
+    (x.tag ? '<div class="t2">' + x.tag + '</div>' : '') + '</div>').join('')
+    : '<div class="empty">还没有记下什么</div>';
+}
+async function me(){
+  const rel = await api('/relation').then(x=>x.json()).catch(()=>null);
+  const id = await api('/identity').then(x=>x.json()).catch(()=>null);
+  const m = await api('/milestones').then(x=>x.json()).catch(()=>null);
+  const q = qget().length;
+  $('#meList').innerHTML =
+    '<div class="h">关系</div>' +
+    '<div class="item"><div class="t1">' + ((rel && rel.tier_name) || '—') + '　' + Math.round((rel && rel.intimacy) || 0) + '/100</div>' +
+      '<div class="t2">' + ((m && m.days) ? ('认识第 ' + m.days + ' 天') : '') + '</div></div>' +
+    '<div class="h">连接</div>' +
+    '<div class="item"><div class="t1">' + (navigator.onLine ? '已连上这台电脑' : '离线') + '</div>' +
+      '<div class="t2">' + (q ? ('待上传 ' + q + ' 条') : '没有待上传') + '</div></div>' +
+    '<div class="h">她</div>' +
+    '<div class="item"><div class="t1">' + ((id && id.assistant) || '—') + '</div>' +
+      '<div class="t2">记忆与人格都在你的电脑上</div></div>';
+}
+function book(){
+  const n = qget().length;
+  const a = document.querySelector('#side a[data-p="me"]');
+  if (!a) return;
+  a.querySelectorAll('.badge').forEach(x => x.remove());
+  if (n) { const sp = document.createElement('span'); sp.className = 'badge'; sp.textContent = n;
+    sp.style.cssText = 'margin-left:auto;min-width:16px;height:16px;line-height:16px;border-radius:8px;background:var(--pink);color:#fff;font-size:10px;padding:0 4px;text-align:center';
+    a.appendChild(sp); }
+}
+
+/* ---------- 启动 ---------- */
+async function boot(){
+  try {
+    const h = await api('/history').then(x=>x.json());
+    const its = (h && h.items || []).slice(-30);
+    const L = $('#log');
+    if (!L.dataset.filled && its.length) {
+      L.innerHTML = '<div class="day">' + dayLabel() + '</div>'; L.dataset.filled = '1';
+      its.forEach(m => add(m.text || '', m.who === 'me' ? 'me' : 'her'));
+    }
+  } catch(e){}
+  try {
+    const id = await api('/identity').then(x=>x.json());
+    $('#nm').textContent = id.assistant || 'Aster';
+  } catch(e){}
+  try {
+    const f = await api('/face').then(x=>x.json());
+    const nm = $('#nm').textContent || 'A';
+    if (f.path) { const im = $('#av'); if (im) im.src = '/img?f=' + encodeURIComponent(f.path);
+      const i2 = $('#av2'); i2.style.display='block'; i2.src = '/img?f=' + encodeURIComponent(f.path); $('#avph').style.display='none'; }
+    else { $('#avph').textContent = nm.slice(0,1); }
+    $('#nm2').textContent = nm;
+  } catch(e){}
+  try {
+    const m = await api('/mood').then(x=>x.json());
+    if (m.mood) { $('#st').textContent = m.mood; $('#st2').textContent = m.mood; }
+  } catch(e){}
+  setNet('在线', true);
+  book();
+}
+function setNet(txt, on){ const n=$('#net'); if(!n) return; n.classList.toggle('on', !!on); n.title = txt; }
+window.addEventListener('online', () => { setNet('在线', true); flush(); });
+window.addEventListener('offline', () => { setNet('离线', false); });
+function dayLabel(){ const d=new Date();
+  return (d.getMonth()+1) + ' 月 ' + d.getDate() + ' 日'; }
+boot(); snapshot();
+setInterval(flush, 20000);
+</script></body></html>
+"""
 
 
 def _lan_ip() -> str:
@@ -4350,6 +4687,9 @@ def work_context(text: str, budget: int = 30000) -> str:
 _LAST_TALK = 0.0
 
 
+_DRY = False
+
+
 def chat(text: str) -> dict:
     global _LAST_TALK
     ensure_defaults()
@@ -4676,6 +5016,7 @@ def chat(text: str) -> dict:
                 + (("他现在的情绪：" + _emo + "\n") if _emo else "")
                 + (("你该用的语气：" + _tone + "\n") if _tone else "")
                 + (("你对他的了解：\n" + prof.get("text", "")[:600] + "\n") if prof.get("text") else "")
+                + ((facts_line() + "\n") if facts_line() else "")
                 + (("他说过这些（第三人称「他」都是他本人，别当成你自己；这些你确实记得，别说不记得）：\n"
                     + "\n".join("· " + to_third(m, _owner_line(m)) for m in mem) + "\n") if mem else "")
                 + (("更早聊过的（摘要）：\n" + summary_text() + "\n") if summary_text() else "")
@@ -4824,7 +5165,13 @@ def chat(text: str) -> dict:
     maybe_compact()
     # 2026-11-22：把「这一轮真的用进了提示的记忆」原样带回去，界面拿这个显示「想起：…」。
     # 以前界面自己再请求一次 /recall，关键词不同，显示的常和真塞进提示的不是同一条。
+    try:
+        if not _DRY:
+            facts_extract(text)
+    except Exception:
+        pass
     _recalled = [str(m)[:60] for m in (mem or []) if str(m).strip()][:2]
+    _touch_recalled([str(m) for m in (mem or []) if str(m).strip()])
     return {"ok": True, "reply": out, "intent": cls.get("intent"), "need": _need, "keywords": kws,
             "compressed": _long, "brief": (_brief[:120] if _long else ""),
             "memory_hits": len(mem), "recalled": _recalled, "plan": plan_used,
@@ -4965,6 +5312,8 @@ class H(BaseHTTPRequestHandler):
                 pass
 
     def do_POST(self):
+        global _DRY
+        _DRY = False          # 每条请求重新算，别让上一次的干跑标记留下来
         try:
             return self._do_POST_impl()
         except Exception as e:
@@ -5421,8 +5770,25 @@ class H(BaseHTTPRequestHandler):
             return self._json({"ok": True, "items": []})
         if self.path.startswith("/agent/approve") or self.path.startswith("/agent/request"):
             return self._json({"ok": True, "note": "没有待批的事"})
+        if self.path.startswith("/memory/decay"):
+            return self._json(decay(dry=True))
         if self.path.startswith("/habit"):
-            return self._json({"ok": True, "items": [t for t in tasks() if t.get("status") == "open"]})
+            # 2026-11-22：这里原来返回的是「未完成任务」，跟「作息」不是一回事。
+            # 现在按 work.db 的 habit 表汇总：每种作息最常见的几个时刻。
+            out = {}
+            try:
+                import sqlite3 as _sq
+                _c = _sq.connect(os.path.join(HOME, "work.db"), timeout=5)
+                for kind, at, cnt in _c.execute(
+                        "select kind, at, count(*) from habit group by kind, at "
+                        "order by kind, count(*) desc").fetchall():
+                    out.setdefault(kind, [])
+                    if len(out[kind]) < 3:
+                        out[kind].append({"at": at, "n": cnt})
+                _c.close()
+            except Exception:
+                out = {}
+            return self._json({"ok": True, "habit": out})
         if self.path.startswith("/setup/status"):
             ok, out = _sh(HOME, "ollama list", 8)
             names = [l.split()[0] for l in (out or "").splitlines()[1:] if l.split()]
@@ -5590,7 +5956,24 @@ class H(BaseHTTPRequestHandler):
         if self.path.startswith("/schedules"):
             return self._json({"ok": True, "items": schedules()})
         if self.path.startswith("/task/list"):
-            return self._json({"ok": True, "items": tasks()[-20:]})
+            # 2026-11-22：把「这单活留下了什么」一并给出去，工作台才连得起来。
+            _its = tasks()[-20:]
+            _arts = []
+            try:
+                import glob as _g3
+                for _jf in _g3.glob(os.path.join(HOME, "codework", "*", "job.json")):
+                    try:
+                        _d = json.load(open(_jf, encoding="utf-8"))
+                        _arts.append({"task": str(_d.get("task") or ""), "id": _d.get("id"),
+                                      "state": _d.get("state") or ""})
+                    except Exception:
+                        pass
+            except Exception:
+                _arts = []
+            for _t in _its:
+                _goal = str(_t.get("goal") or "")
+                _t["artifacts"] = [a for a in _arts if a["task"] and a["task"] == _goal]
+            return self._json({"ok": True, "items": _its})
         if self.path.startswith("/reminders"):
             items = []
             try:
@@ -5679,8 +6062,17 @@ class H(BaseHTTPRequestHandler):
                 try:
                     d = json.load(open(jf, encoding="utf-8"))
                     _wd = os.path.join(os.path.dirname(jf), "work")
+                    _files = []
+                    try:
+                        if os.path.isdir(_wd):
+                            _files = sorted(x for x in os.listdir(_wd)
+                                            if not x.startswith("."))[:40]
+                    except Exception:
+                        _files = []
                     out.append({"id": d.get("id"), "task": d.get("task"),
-                                "title": d.get("task"), "files": d.get("files") or [],
+                                "title": d.get("task"), "files": _files,
+                                "kind": "codework", "state": d.get("state") or "",
+                                "rerun": True, "from": d.get("from") or "",
                                 "t": int(os.path.getmtime(jf)), "path": _wd,
                                 "rel": _wd, "workdir": _wd})
                 except Exception:
@@ -5762,6 +6154,23 @@ class H(BaseHTTPRequestHandler):
         if self.path.startswith("/debate/say"):
             import debate as _db
             return self._json(_db.job_say(str(body.get("id") or ""), str(body.get("text") or "")))
+        if self.path.startswith("/artifact/rerun"):
+            # 重跑一件活：编码任务按原配置再开一单，新单一并记下「从哪来」。
+            _id = str(body.get("id") or "").strip()
+            if not _id:
+                return self._json({"ok": False, "error": "缺 id"}, 400)
+            _jf = os.path.join(HOME, "codework", _id, "job.json")
+            if not os.path.exists(_jf):
+                return self._json({"ok": False, "error": "找不到这件活"}, 404)
+            try:
+                _d = json.load(open(_jf, encoding="utf-8"))
+            except Exception:
+                return self._json({"ok": False, "error": "这单的记录坏了"}, 500)
+            import codework as _cw
+            _r = _cw.start_job(str(_d.get("task") or ""), _d.get("seats") or [],
+                               int(_d.get("rounds") or 3), float(_d.get("budget") or 0),
+                               origin=_id)
+            return self._json(_r)
         if self.path.startswith("/code/start"):
             import codework as _cw
             return self._json(_cw.start_job(str(body.get("task") or "").strip(),
@@ -6040,6 +6449,23 @@ class H(BaseHTTPRequestHandler):
             items = [x for x in _load(os.path.join(HOME, "trips.json"), []) if str(x.get("id")) != str(tid)]
             _save(os.path.join(HOME, "trips.json"), items)
             return self._json({"ok": True})
+        if self.path.startswith("/facts/backfill"):
+            # 从既有记忆里补捡事实：只读文本、写 facts 表
+            try:
+                import sqlite3 as _sq
+                _c = _sq.connect(DB_FILE, timeout=10)
+                _rows = _c.execute("select text from items where text like '他说的：%' "
+                                   "or text like '我说：%' order by rowid desc limit 4000").fetchall()
+                _c.close()
+            except Exception:
+                _rows = []
+            _n = 0
+            for (_t,) in _rows:
+                _n += facts_extract(str(_t))
+            return self._json({"ok": True, "scanned": len(_rows), "picked": _n,
+                               "facts": facts_all()})
+        if self.path.startswith("/memory/decay"):
+            return self._json(decay(dry=False))
         if self.path.startswith("/habit/set"):
             _key = str(body.get("key") or "").strip()[:12]
             _val = str(body.get("value") or "").strip()[:40]
@@ -6181,6 +6607,10 @@ class H(BaseHTTPRequestHandler):
                                                         "content": out.get("reply") or ""}}]})
         if self.path.startswith("/chat"):
             text = str(body.get("text") or "").strip()
+            # 自检用的干跑：不写聊天、不进记忆、不动情绪
+            if body.get("dry"):
+                global _DRY
+                _DRY = True
             # 2026-11-20：所有回复分支统一落盘，界面只认这一份历史
             _orig_json = self._json
             def _json_chat(payload, code=200, _t=text, _f=_orig_json):
@@ -6429,6 +6859,32 @@ def main():
     except Exception:
         pass
     threading.Thread(target=_qq_sender, daemon=True).start()
+
+    def _decay_loop():
+        # 每六小时把记忆重新分一次级：模糊、忘掉，都是渐进的，不硬删。
+        while True:
+            try:
+                log("memory decay", json.dumps(decay(dry=False), ensure_ascii=False))
+            except Exception as e:
+                log("memory decay failed", str(e)[:80])
+            time.sleep(6 * 3600)
+
+    # 上次退出时还在跑的单子，重启后不会自己接着跑：标成中断，别一直显示「进行中」
+    try:
+        import glob as _g0
+        for _jf in _g0.glob(os.path.join(HOME, "codework", "*", "job.json")):
+            try:
+                _d = json.load(open(_jf, encoding="utf-8"))
+                if _d.get("state") == "running":
+                    _d["state"] = "interrupted"
+                    _d.setdefault("notes", []).append("引擎重启，这单断了")
+                    json.dump(_d, open(_jf, "w", encoding="utf-8"), ensure_ascii=False)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    threading.Thread(target=_decay_loop, daemon=True).start()
     print("core up on", port, flush=True)
     bind = os.environ.get("ASTER_BIND", "0.0.0.0")   # 手机要能连进来，不能只绑本机
     ThreadingHTTPServer((bind, port), H).serve_forever()
