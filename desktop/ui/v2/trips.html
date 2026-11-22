@@ -1,0 +1,74 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Aster · 日程</title>
+<link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="shell.css"><link rel="stylesheet" href="pages.css">
+<style>
+ .dragbar{position:fixed;left:0;top:0;right:0;height:30px;-webkit-app-region:drag;app-region:drag}
+ .wrap{max-width:820px;margin:0 0 0 240px;padding:54px 26px 80px;display:flex;flex-direction:column;gap:16px}
+ .card{background:#fff;border:1px solid var(--line2);border-radius:16px;padding:18px 20px}
+ .card h2{margin:0 0 4px;font-size:14px;font-weight:600}
+ .card p{margin:0 0 14px;font-size:12px;color:var(--ink2);line-height:1.8}
+ .row{display:flex;gap:10px;flex-wrap:wrap}
+ input{height:34px;border:1px solid var(--line2);border-radius:9px;padding:0 12px;font-size:12.5px;outline:none}
+ .btn{height:34px;padding:0 16px;border-radius:9px;border:1px solid var(--line2);background:#fff;font-size:12.5px;cursor:pointer}
+ .btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+ .it{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-top:1px solid #f4f1ec}
+ .it .w{flex:0 0 96px;font-family:var(--mono);font-size:11px;color:var(--dim)}
+ .it b{display:block;font-size:13px;font-weight:500;line-height:1.6}
+ .it span{font-size:11.5px;color:var(--ink2)}
+ .del{color:var(--dim);cursor:pointer;font-size:11.5px}
+ .empty{font-size:12px;color:var(--dim)}
+</style></head><body>
+<div class="dragbar"></div>
+<div class="wrap">
+  <div class="card">
+    <h2><span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--pink);margin-right:6px;vertical-align:middle"></span><span data-zh="日程" data-en="Schedule">日程</span></h2>
+    <p data-zh="行程、会议与待办均可记在此处：哪天、几点、需要注意什么。" data-en="Trips, meetings and to-dos: when, what and what to note.">行程、会议与待办均可记在此处：哪天、几点、需要注意什么。</p>
+    <div class="row">
+      <input id="when" placeholder="时间（例如 11-23 23:20）" style="width:180px">
+      <input id="what" placeholder="内容（例如 重庆→昆明 祥鹏8L9858 / 三点与设计组开会）" style="flex:1;min-width:240px">
+      <select id="kind" style="height:34px;border:1px solid var(--line2);border-radius:9px;padding:0 10px;font-size:12.5px;background:#fff">
+        <option value="">自动判断</option>
+        <option value="trip">出行</option>
+        <option value="meeting">会议</option>
+        <option value="todo">待办</option>
+      </select>
+      <button class="btn primary" id="add" data-zh="保存" data-en="Save">保存</button>
+    </div>
+    <div id="msg" style="font-size:11.5px;color:var(--dim);margin-top:8px"></div>
+  </div>
+  <div class="card"><div id="list"><div class="empty">暂无安排。</div></div></div>
+</div>
+<script src="i18n.js"></script><script src="api.js"></script><script src="nav.js"></script><script src="lang-toggle.js"></script>
+<script>
+const $ = (s) => document.querySelector(s);
+const L = (zh, en) => (window.lang && lang() === 'en') ? en : zh;
+let API = '';
+async function paint() {
+  const d = await fetch(API + '/trips').then((r) => r.json()).catch(() => null);
+  const items = (d && d.items) || [];
+  $('#list').innerHTML = items.length ? items.slice().reverse().map((x) =>
+    '<div class="it" style="' + (x.ended ? 'opacity:.5' : '') + '"><div class="w">' +
+    ({trip:'出行', meeting:'会议', todo:'待办'}[x.kind] || '安排') + '<br>' + (x.when || '—') +
+    (x.ended ? '<br><span style="color:var(--dim)">' + L('已结束', 'ended') + '</span>' : '') + '</div>' +
+    '<div style="flex:1"><b>' + (x.what || '') + '</b>' + (x.note ? '<span>' + x.note + '</span>' : '') + '</div>' +
+    '<span class="del" data-id="' + x.id + '">' + L('删除', 'delete') + '</span></div>').join('')
+    : '<div class="empty">' + L('暂无安排。', 'Nothing yet.') + '</div>';
+  document.querySelectorAll('.del').forEach((b) => b.onclick = async () => {
+    await fetch(API + '/trip/del', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: b.dataset.id }) });
+    paint();
+  });
+}
+(async function () {
+  API = await findAPI();
+  $('#add').onclick = async () => {
+    const what = $('#what').value.trim();
+    if (!what) return;
+    await fetch(API + '/trip/add', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ what, when: $('#when').value.trim(), kind: $('#kind').value }) });
+    $('#what').value = ''; $('#when').value = '';
+    $('#msg').textContent = L('记好了', 'saved');
+    paint();
+  };
+  paint();
+})();
+</script></body></html>

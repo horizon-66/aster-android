@@ -1,0 +1,80 @@
+<!doctype html><meta charset="utf-8">
+<title>face</title>
+<style>html,body{margin:0;height:100%;background:#07070a;overflow:hidden}canvas{display:block}</style>
+<canvas id=c></canvas>
+<script>
+const c = document.getElementById('c'), x = c.getContext('2d');
+function fit(){ c.width = innerWidth; c.height = innerHeight; }
+addEventListener('resize', fit); fit();
+
+let st = { mood: 'idle', talk: 0, look: 0 };   // look: -1 左 / 0 中 / 1 右
+let lastPoll = 0;
+async function poll(){
+  try {
+    const r = await fetch('/state?t=' + Date.now());
+    if (r.ok) st = await r.json();
+  } catch (e) {}
+}
+setInterval(poll, 120);
+poll();
+
+const t0 = performance.now();
+let blink = 0, nextBlink = 2000 + Math.random() * 3000;
+
+function draw(now){
+  const t = (now - t0) / 1000, w = c.width, h = c.height;
+  x.fillStyle = '#07070a'; x.fillRect(0, 0, w, h);
+
+  // 情绪：决定底色和亮度
+  const moodColor = st.mood === 'angry' ? '232,23,61' : st.mood === 'warm' ? '232,120,90' : '232,23,61';
+  const breathe = 0.5 + 0.5 * Math.sin(t * (st.mood === 'angry' ? 2.2 : 0.9));
+  const g = x.createRadialGradient(w/2, h/2, 20, w/2, h/2, w * 0.55);
+  g.addColorStop(0, `rgba(${moodColor},${0.08 + breathe * 0.07})`);
+  g.addColorStop(1, `rgba(${moodColor},0)`);
+  x.fillStyle = g; x.fillRect(0, 0, w, h);
+
+  if (now > nextBlink) { blink = 1; nextBlink = now + 2500 + Math.random() * 4000; }
+  blink *= 0.90;
+
+  const angry = st.mood === 'angry';
+  const eyeW = w * (angry ? 0.14 : 0.155);
+  const eyeH = w * (angry ? 0.10 : 0.185) * (1 - blink * 0.92);
+  const dx = w * 0.155, cy = h / 2 - (angry ? h * 0.02 : 0);
+  const gaze = (st.look || 0) * w * 0.03;
+
+  for (const s of [-1, 1]) {
+    const eg = x.createLinearGradient(0, cy - eyeH/2, 0, cy + eyeH/2);
+    eg.addColorStop(0, '#fff6f2'); eg.addColorStop(1, '#e6d6d1');
+    x.fillStyle = eg;
+    x.beginPath(); x.ellipse(w/2 + s*dx, cy, eyeW/2, Math.max(2, eyeH/2), 0, 0, Math.PI*2); x.fill();
+    if (eyeH > 8) {
+      const pr = Math.min(eyeW, eyeH) * 0.30;
+      const px = w/2 + s*dx + gaze + Math.sin(t*0.6)*w*0.008;
+      const py = cy + Math.cos(t*0.45)*h*0.006;
+      x.fillStyle = '#2a1216';
+      x.beginPath(); x.arc(px, py, pr, 0, Math.PI*2); x.fill();
+      x.fillStyle = 'rgba(255,255,255,0.85)';
+      x.beginPath(); x.arc(px - pr*0.35, py - pr*0.4, pr*0.26, 0, Math.PI*2); x.fill();
+    }
+    // 生气：眉头压下来
+    if (angry) {
+      x.strokeStyle = 'rgba(232,23,61,0.9)'; x.lineWidth = w*0.012;
+      x.beginPath();
+      x.moveTo(w/2 + s*dx - eyeW*0.55, cy - eyeH/2 - w*0.02);
+      x.lineTo(w/2 + s*dx + eyeW*0.55*(s>0?-1:1), cy - eyeH/2 - w*0.005);
+      x.stroke();
+    }
+  }
+
+  // 说话：嘴动
+  if (st.talk) {
+    const open = Math.abs(Math.sin(t * 9)) * w * 0.05 + w * 0.008;
+    x.fillStyle = 'rgba(240,220,215,0.9)';
+    x.beginPath();
+    x.ellipse(w/2, h*0.68, w*0.075, open, 0, 0, Math.PI*2);
+    x.fill();
+  }
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+</script>

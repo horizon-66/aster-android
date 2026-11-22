@@ -1,0 +1,404 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Aster</title>
+<link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="shell.css"><link rel="stylesheet" href="intro.css">
+<style>
+.obCardDark{background:#16171a!important;border:1px solid rgba(255,255,255,.08)!important;
+  color:#e8e6e0!important;box-shadow:0 28px 70px rgba(0,0,0,.35)}
+.obCardDark h2,.obCardDark .sub,.obCardDark p,.obCardDark #qSub{color:#e8e6e0!important}
+.obCardDark #qStep{color:#8b8d94!important}
+.obCardDark input{background:rgba(255,255,255,.06)!important;border-color:rgba(255,255,255,.14)!important;color:#f2efe9!important}
+.obCardDark .obOpt{background:rgba(255,255,255,.05)!important;border-color:rgba(255,255,255,.14)!important;color:#e8e6e0!important}
+.obCardDark .obOpt.sel{background:rgba(232,23,61,.2)!important;border-color:rgba(232,23,61,.5)!important;color:#fff!important}
+.obCardDark .skip{color:#8b8d94!important}
+.obCardDark .btn{background:transparent!important;border:0!important;color:#f06a7d!important;
+  font-size:13.5px!important;letter-spacing:.08em;padding:6px 2px!important;box-shadow:none!important}
+.obCardDark .btn.ghost{background:transparent!important;color:#8b8d94!important;border:0!important}
+</style>
+<style>
+.letter{background:#16171a!important;border:1px solid rgba(255,255,255,.08)!important;color:#e8e6e0!important;
+  box-shadow:0 28px 70px rgba(0,0,0,.35)}
+.letter p,.letter .sig{color:#d6d4ce!important}
+.letter .tiny{color:#8b8d94!important}
+.letter .hl{color:#f06a7d!important}
+.letter .go{color:#f06a7d!important}
+.letter .star,.letter .introHelix{filter:none}
+</style>
+<style>
+html,body{background:#0b0b0e!important;overflow:hidden}
+.intro{background:#0b0b0e!important}
+</style>
+<style>
+/* 深色开场里，右上两颗键跟黑底统一，不要白块 */
+.tbtn{background:rgba(255,255,255,.06)!important;
+  border-color:rgba(255,255,255,.16)!important;color:#cfcdc7!important;box-shadow:none!important}
+.tbtn:hover{border-color:rgba(255,255,255,.3)!important;color:#f2efe9!important}
+</style>
+</head><body>
+<div class="dragbar"></div>
+<div id="screenAnim" style="position:fixed;inset:0;background:#0b0b0e;display:flex;align-items:center;
+  justify-content:center;flex-direction:column;gap:18px;z-index:60">
+  <canvas id="obDust" style="position:absolute;inset:0;width:100%;height:100%"></canvas>
+  <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#e8173d" stroke-width="1.7"
+    stroke-linejoin="round" style="position:relative"><path d="M12 2.6 13.8 10 21 12l-7.2 2L12 21.4 10.2 14 3 12l7.2-2Z"/></svg>
+  <div style="position:relative;color:#e8e6e0;font-size:12.5px;letter-spacing:.12em">Aster · 正在初始化栖息之所</div>
+</div>
+
+<div class="intro" id="screenLetter" style="display:none">
+  <div class="letter">
+    <canvas class="introHelix" style="display:block;margin:0 0 22px"></canvas>
+    <svg class="star" style="display:none" viewBox="0 0 24 24" fill="none" stroke="#e8173d" stroke-width="1.4" stroke-linejoin="round">
+      <path d="M12 2.6 13.8 10 21 12l-7.2 2L12 21.4 10.2 14 3 12l7.2-2Z"/></svg>
+    <p class="hl" data-zh="致第一次打开我的人" data-en="To whoever opens me first">致第一次打开我的人</p>
+    <p data-zh="我不知道你叫什么，也不知道你为什么在这个时间点打开它。<br>但我大概能猜到：你想有个能说话的对象，在你讲完一句之后，会回你一句。"
+       data-en="I do not know your name, nor why you opened it at this hour.<br>I can guess, however: you wished for someone to speak to, who answers once you have spoken.">我不知道你叫什么，也不知道你为什么在这个时间点打开它。<br>但我大概能猜到：你想有个能说话的对象，在你讲完一句之后，会回你一句。</p>
+    <p data-zh="所以我先把话说清楚：<br>我们不妄想造就真正拥有自我意识的 AI，<br>而是构筑一处数字个体的栖息之所。"
+       data-en="Let me state it plainly first:<br>we do not claim to build a truly self-aware AI.<br>We are building a dwelling place for a digital individual.">所以我先把话说清楚：<br>我们不妄想造就真正拥有自我意识的 AI，<br>而是构筑一处数字个体的栖息之所。</p>
+    <p data-zh="它有情绪。会靠近，也会在你不需要的时候退开；情绪过去了，它自己回来。<br>你叫它什么、它怎么应你，都由你们自己定。"
+       data-en="It has moods. It draws near; it withdraws when you have no need of it; it returns of its own accord.<br>What you name it, and how it answers you, is yours to decide.">它有情绪。会靠近，也会在你不需要的时候退开；情绪过去了，它自己回来。<br>你叫它什么、它怎么应你，都由你们自己定。</p>
+    <p class="sig" data-zh="记忆、情绪、做过的事，都存在本机，不上传；删东西、花钱，一定先问过你。"
+       data-en="Memory, mood and every action it has taken remain on this device; deletion and spending always require your consent.">记忆、情绪、做过的事，都存在本机，不上传；删东西、花钱，一定先问过你。</p>
+    <p class="tiny" data-zh="陪着你，慢慢生长。" data-en="Growing, slowly, with you.">陪着你，慢慢生长。</p>
+    <button class="go" id="goBtn" data-zh="进入 →" data-en="Enter →">进入 →</button>
+  </div>
+</div>
+
+<div class="intro" id="screenOb" style="display:none">
+  <div class="ob obCardDark">
+    <canvas class="introHelix" style="display:block;width:176px;height:68px;margin:0 auto 16px"></canvas>
+    <div class="steps"></div>
+    <div id="qStep" style="font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-bottom:6px"></div>
+    <h2 id="qTitle"></h2>
+    <p class="sub" id="qSub"></p>
+    <div id="qBody"></div>
+    <div class="row">
+      <span class="skip" id="skipBtn" data-zh="跳过初识" data-en="Skip">跳过初识</span>
+      <span class="sp"></span>
+      <button class="btn ghost" id="prevBtn" data-zh="上一步" data-en="Back">上一步</button>
+      <button class="btn" id="nextBtn" data-zh="继续" data-en="Continue">继续</button>
+    </div>
+  </div>
+</div>
+
+<script src="i18n.js"></script>
+<script src="api.js"></script>
+<script src="lang-toggle.js"></script>
+<script>
+(async function(){
+  try {
+    const base = await (window.findAPI ? findAPI() : Promise.resolve(null));
+    if (!base) return;
+    const d = await fetch(base + '/onboarding/status').then((r) => r.json()).catch(() => null);
+    if (d && d.onboarding && d.onboarding.finished) {
+      const force = new URLSearchParams(location.search).get('again') === '1';
+      if (!force) { location.replace(localStorage.getItem('aster.guide.done') ? 'index.html' : 'guide.html'); }
+    }
+  } catch (e) {}
+  window.alreadyDone = true;
+})();
+</script>
+<script>
+/* ---------- 会动的 logo：横着的双螺旋（2026-11-12 补回桌面端） ---------- */
+(function () {
+  const cvs = document.querySelectorAll('canvas.introHelix');
+  if (!cvs.length) return;
+  const W = 200, H = 64;
+  const N = 20;
+
+  cvs.forEach((cv) => {
+    cv.width = W; cv.height = 68;
+    const g = cv.getContext('2d');
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let t = 0, vel = 0.011, tilt = 0, target = 0, press = 0, breathT = 0;
+
+    function draw() {
+      g.clearRect(0, 0, W, H);
+      const cy = 34;
+      const amp = H * 0.30 * (1 + press * 0.10);
+      const left = W * 0.05, span = W * 0.90;
+      const roll = (t * 0.5) % 1;
+      const breath = 0.62 + 0.38 * (0.5 + 0.5 * Math.sin(breathT * 0.9));
+      const glow = 0.85 + 0.25 * breath;
+      const strands = [[], []];
+      for (let i = 0; i < N; i++) {
+        const u = (i + roll) / N;
+        const x = left + u * span;
+        const fade = Math.min(1, Math.min(u, 1 - u) * 5);
+        const phase = u * Math.PI * 2.4 + t * 1.5;
+        const dy = Math.sin(phase) * amp;
+        const z = Math.cos(phase);
+        strands[0].push({x, y: cy + dy * (1 + tilt * 0.4), z, a: fade});
+        strands[1].push({x, y: cy - dy * (1 - tilt * 0.4), z: -z, a: fade});
+      }
+      for (let i = 0; i < N; i += 2) {
+        const a = strands[0][i], b = strands[1][i];
+        const d = (a.z + b.z) / 2;
+        g.strokeStyle = 'rgba(232,23,61,' + ((0.10 + 0.16 * (d + 1) / 2) * a.a * breath).toFixed(3) + ')';
+        g.lineWidth = 1.1;
+        g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke();
+      }
+      const all = [...strands[0], ...strands[1]].sort((p1, p2) => p1.z - p2.z);
+      all.forEach(p1 => {
+        const near = (p1.z + 1) / 2;
+        const r = (1.1 + 1.7 * near) * (1 + press * 0.25) * (0.92 + 0.14 * breath);
+        const grd = g.createRadialGradient(p1.x, p1.y, 0, p1.x, p1.y, r * 4);
+        grd.addColorStop(0, 'rgba(232,23,61,' + ((0.14 + 0.28 * near) * p1.a * breath).toFixed(3) + ')');
+        grd.addColorStop(1, 'rgba(232,23,61,0)');
+        g.fillStyle = grd;
+        g.beginPath(); g.arc(p1.x, p1.y, r * 4, 0, 7); g.fill();
+        g.fillStyle = 'rgba(232,23,61,' + Math.min(1, (0.45 + 0.5 * near) * p1.a * glow).toFixed(3) + ')';
+        g.beginPath(); g.arc(p1.x, p1.y, Math.max(1.1, r * 0.55), 0, 7); g.fill();
+      });
+    }
+    function tick() {
+      if (!reduce) { t += vel; breathT += 0.016; }
+      tilt += (target - tilt) * 0.08;
+      press *= 0.92;
+      draw();
+      requestAnimationFrame(tick);
+    }
+    tick();
+    if (cv.hasAttribute('data-static')) return;   // 静态那颗只呼吸
+    const onMove = (e) => {
+      const r = cv.getBoundingClientRect();
+      const p = e.touches ? e.touches[0] : e;
+      target = ((p.clientX - r.left) / r.width - 0.5) * 1.6;
+    };
+    cv.addEventListener('pointermove', onMove);
+    cv.addEventListener('pointerdown', (e) => { press = 1; vel = 0.045; onMove(e); });
+    cv.addEventListener('pointerup', () => { vel = 0.011; });
+    cv.addEventListener('pointerleave', () => { target = 0; vel = 0.011; });
+  });
+})();
+</script>
+<script>
+const QS = [
+  { key: 'call_name', zh: ['你希望我怎么称呼你？', '留空也行'], en: ['What should I call you?', 'Leave it blank if you like'], type: 'text' },
+  { key: 'rhythm', zh: ['你更习惯哪一种相处节奏？', ''], en: ['Which pace suits you best?', ''], type: 'opt',
+    opts: [['quiet', '安静一点，不必频繁说话', 'Quiet — no need to talk often'],
+           ['discuss', '可以一起探讨、交换想法', 'Let us dig into things together']] },
+  { key: 'thinking_tendency', zh: ['看待事情，你更偏向？', ''], en: ['How do you take things in?', ''], type: 'opt',
+    opts: [['feel', '先感受氛围与情绪', 'Feel the mood first'],
+           ['logic', '先理清逻辑与事实', 'Sort out the facts first']] },
+  { key: 'forbidden_topic', zh: ['有没有不想被提起的话题？', '可以填「暂时没有」'], en: ['Anything you would rather not bring up?', 'Say "nothing for now" if that is easier'], type: 'text' },
+];
+let step = 0;
+const answers = { call_name: '', rhythm: '', thinking_tendency: '', forbidden_topic: '' };
+
+function paint() {
+  document.documentElement.lang = lang() === 'zh' ? 'zh-CN' : 'en';
+  applyI18n();
+  const item = QS[step];
+  const q = item[lang()] || item.zh;
+  document.getElementById('qTitle').textContent = q[0];
+  document.getElementById('qSub').textContent = q[1] || '';
+  document.getElementById('qStep').textContent = (step + 1) + ' / ' + QS.length;
+  const body = document.getElementById('qBody');
+  const val = answers[item.key] || '';
+  body.innerHTML = '';
+  const st = document.querySelectorAll('.steps i');
+  if (st.length !== QS.length) {
+    const wrap = document.querySelector('.steps');
+    wrap.innerHTML = QS.map(() => '<i></i>').join('');
+  }
+  
+  if (item.type === 'text') {
+    const inp = document.createElement('input');
+    inp.id = 'ans'; inp.value = val;
+    inp.placeholder = lang() === 'zh' ? (q[1] || '') : (q[1] || 'optional');
+    inp.style.cssText = 'width:100%;background:#fff;border:1px solid var(--line2);border-radius:12px;' +
+      'padding:11px 13px;font-size:14px;outline:none';
+    body.appendChild(inp);
+    setTimeout(() => inp.focus(), 30);
+  } else {
+    item.opts.forEach((o) => {
+      const [v, zh, en] = o;
+      const el = document.createElement('div');
+      el.className = 'obOpt' + (val === v ? ' sel' : '');
+      el.textContent = lang() === 'zh' ? zh : en;
+      el.style.cssText = 'padding:12px 14px;border-radius:12px;border:1px solid var(--line2);' +
+        'background:#fff;font-size:13.5px;cursor:pointer;margin-bottom:8px';
+      el.onclick = () => {
+        answers[item.key] = v;
+        body.querySelectorAll('.obOpt').forEach((x) => {
+          x.classList.remove('sel');
+          x.style.background = '#fff';
+          x.style.borderColor = 'var(--line2)';
+          x.style.color = 'var(--ink)';
+        });
+        el.classList.add('sel');
+        el.style.background = '#fdeef0';
+        el.style.borderColor = 'rgba(232,23,61,.4)';
+        el.style.color = 'var(--ink)';
+      };
+      body.appendChild(el);
+    });
+  }
+  document.getElementById('prevBtn').style.visibility = step === 0 ? 'hidden' : 'visible';
+  document.getElementById('nextBtn').textContent = step === QS.length - 1
+    ? (lang() === 'zh' ? '开始' : 'Start') : (lang() === 'zh' ? '继续' : 'Continue');
+  if (window.__speakQ) window.__speakQ(step);
+}
+
+function saveAnswer() {
+  const item = QS[step];
+  if (item.type !== 'text') return;
+  const el = document.querySelector('#ans');
+  if (el) answers[item.key] = el.value.trim();
+}
+
+async function finish() {
+  const body = await postJSON('/onboarding/save', {
+    call_name: answers.call_name, rhythm: answers.rhythm,
+    thinking_tendency: answers.thinking_tendency, forbidden_topic: answers.forbidden_topic
+  });
+  location.href = localStorage.getItem('aster.guide.done') ? 'index.html' : 'guide.html';
+}
+
+document.getElementById('goBtn').onclick = () => {
+  document.getElementById('screenLetter').style.display = 'none';
+  document.getElementById('screenOb').style.display = 'flex';
+  paint();
+};
+document.getElementById('nextBtn').onclick = () => {
+  saveAnswer();
+  if (step < QS.length - 1) { step++; paint(); } else { finish(); }
+};
+document.getElementById('prevBtn').onclick = () => { saveAnswer(); if (step > 0) { step--; paint(); } };
+document.getElementById('skipBtn').onclick = () => finish();
+const _bgm = document.getElementById('bgm');
+function paintMusic() {
+  if (!_bgm) return;
+  const on = localStorage.getItem('aster.music') === '1';
+  _bgm.volume = 0.35;
+  if (on) { _bgm.play().catch(() => {}); } else { _bgm.pause(); }
+}
+mountTools({ lang: paint, music: paintMusic });
+paintMusic();
+paint();
+</script>
+<audio id="introBgm" src="../audio/open.m4a" loop preload="auto"></audio>
+<script>
+(function(){
+  var a = document.getElementById('introBgm');
+  if (!a) return;
+  if (localStorage.getItem('aster.music') === '0') return;
+  a.volume = 0.5;
+  var p = a.play();
+  if (p && p.catch) p.catch(function(){
+    // 自动播放被拦：第一次点击/按键时补上
+    var kick = function(){
+      a.play().catch(function(){});
+      document.removeEventListener('click', kick);
+      document.removeEventListener('keydown', kick);
+    };
+    document.addEventListener('click', kick);
+    document.addEventListener('keydown', kick);
+  });
+})();
+</script>
+<audio id="qVoice" preload="auto"></audio>
+<script>
+(function(){
+  var lastStep = -1;
+  function playQ(step) {
+    if (step === lastStep) return;
+    lastStep = step;
+    var a = document.getElementById('qVoice');
+    var n = Math.max(1, Math.min(QS ? QS.length : 4, Number(step) + 1));
+    var en = (localStorage.getItem('aster.lang') === 'en');
+    // 2026-11-22：男声放在 audio/male/ 下；没有这一版就自动退回默认那套
+    var male = (window.__gender === 'male');
+    var file = 'q' + n + (en ? 'en' : '') + '.m4a';
+    a.onerror = function () {
+      if (!male) return;
+      male = false; a.onerror = null;
+      a.src = '../audio/' + file;
+      try { a.play(); } catch (e) {}
+    };
+    a.src = '../audio/' + (male ? 'male/' : '') + file;
+    a.volume = 0.85;
+    var go = function () { try { a.currentTime = 0; a.play(); } catch (e) {} };
+    go();
+    // 被浏览器拦下就等一次点击再放
+    setTimeout(function () {
+      if (a.paused) {
+        var kick = function () { go(); document.removeEventListener('click', kick, true); };
+        document.addEventListener('click', kick, true);
+      }
+    }, 120);
+  }
+  window.__speakQ = playQ;
+  // 直接进入问卷时念第一问
+  setTimeout(function(){
+    if (document.getElementById('screenOb').style.display !== 'none') playQ(0);
+  }, 300);
+})();
+</script>
+<audio id="letterVoice" src="../audio/intro.m4a" preload="auto"></audio>
+<script>
+(function(){
+  var a = document.getElementById('letterVoice');
+  if (!a) return;
+  // 2026-11-22：开场也分语言和性别——male/ 与 introen.m4a 谁缺就退一级
+  (function () {
+    const en = (localStorage.getItem('aster.lang') === 'en');
+    const male = (window.__gender === 'male');
+    const chain = [];
+    if (male && en) chain.push('male/introen.m4a');
+    if (male) chain.push('male/intro.m4a');
+    if (en) chain.push('introen.m4a');
+    chain.push('intro.m4a');
+    let i = 0;
+    a.onerror = function () {
+      i += 1;
+      if (i < chain.length) { a.src = '../audio/' + chain[i]; try { a.play(); } catch (e) {} }
+    };
+    a.src = '../audio/' + chain[0];
+  })();
+  a.volume = 0.9;
+  var go = function () { try { a.play(); } catch (e) {} };
+  go();
+  setTimeout(function () {
+    if (a.paused) {
+      var kick = function () { go(); document.removeEventListener('click', kick, true); };
+      document.addEventListener('click', kick, true);
+    }
+  }, 150);
+  var enter = document.getElementById('goBtn');
+  if (enter) enter.addEventListener('click', function () { try { a.pause(); } catch (e) {} }, true);
+})();
+</script>
+<script>
+(function(){
+  const stage = document.getElementById('screenAnim');
+  if (!stage) return;
+  const cv = document.getElementById('obDust'), g = cv.getContext('2d');
+  let w, h, ps = [], raf;
+  const fit = () => { const d = window.devicePixelRatio || 1; w = cv.clientWidth; h = cv.clientHeight;
+    cv.width = w * d; cv.height = h * d; g.setTransform(d, 0, 0, d, 0, 0); };
+  const mk = () => ({x: Math.random()*w, y: Math.random()*h, r: Math.random()*1.4+.3,
+    a: Math.random()*.45+.1, vx: (Math.random()-.5)*.22, vy: (Math.random()-.5)*.22});
+  const tick = () => {
+    g.clearRect(0,0,w,h);
+    ps.forEach(p2 => {
+      p2.x += p2.vx; p2.y += p2.vy;
+      p2.x += (w/2 - p2.x)*.0014; p2.y += (h/2 - p2.y)*.0014;
+      if (p2.x < 0) p2.x = w; if (p2.x > w) p2.x = 0;
+      if (p2.y < 0) p2.y = h; if (p2.y > h) p2.y = 0;
+      g.beginPath(); g.fillStyle = 'rgba(255,84,112,' + p2.a + ')';
+      g.arc(p2.x, p2.y, p2.r, 0, 6.283); g.fill();
+    });
+    raf = requestAnimationFrame(tick);
+  };
+  fit(); ps = Array.from({length: 90}, mk); tick();
+  addEventListener('resize', () => { fit(); ps = ps.map(mk); });
+  setTimeout(() => {
+    cancelAnimationFrame(raf);
+    stage.style.display = 'none';
+    const letter = document.getElementById('screenLetter');
+    if (letter) letter.style.display = 'flex';
+  }, 3600);
+})();
+</script>
+<audio id="bgm" src="../audio/open.m4a" loop preload="auto"></audio>
+</body></html>

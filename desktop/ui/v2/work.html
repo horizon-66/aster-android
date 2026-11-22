@@ -1,0 +1,142 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Aster · 工作台</title>
+<link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="shell.css">
+<link rel="stylesheet" href="pages.css">
+</head><body class="hasNav">
+<div class="dragbar"></div>
+<div class="page">
+  <h1 class="ptitle" data-zh="工作台" data-en="Workbench">工作台</h1>
+  <p class="lead" data-zh="查看进行中的任务、受阻项与已完成项。" data-en="Review ongoing tasks, blocked items and completed work.">查看进行中的任务、受阻项与已完成项。</p>
+  <div class="dark" id="stats">
+    <h5 class="h5" data-zh="概览" data-en="Overview">概览</h5>
+    <div class="row2">
+      <div><div class="num pink" id="nRun">0</div><div class="cap" data-zh="进行中" data-en="Running">进行中</div></div>
+      <div><div class="num" id="nWait">0</div><div class="cap" data-zh="排队中" data-en="Queued">排队中</div></div>
+      <div><div class="num" id="nBlock">0</div><div class="cap" data-zh="受阻" data-en="Blocked">受阻</div></div>
+      <div><div class="num" id="nDone">0</div><div class="cap" data-zh="已完成" data-en="Completed">已完成</div></div>
+    </div>
+  </div>
+  <div class="toolbar">
+    <input class="search" id="q" data-zh-ph="搜索任务…" data-en-ph="Search tasks…" placeholder="搜索任务…">
+    <span class="tab on" data-f="all" data-zh="全部" data-en="All">全部</span>
+    <span class="tab" data-f="running" data-zh="进行中" data-en="Running">进行中</span>
+    <span class="tab" data-f="blocked" data-zh="受阻" data-en="Blocked">受阻</span>
+    <span class="tab" data-f="done" data-zh="已完成" data-en="Completed">已完成</span>
+  </div>
+  <div class="panel"><div class="msg" id="tip" style="min-height:16px"></div><div class="list" id="list"></div></div>
+  <div class="panel" style="margin-top:14px">
+    <h5 class="h5" data-zh="最近的产物" data-en="Recent outputs">最近的产物</h5>
+    <div class="list" id="arts"></div>
+  </div>
+</div>
+<script src="i18n.js"></script><script src="api.js"></script><script src="nav.js"></script>
+<script src="lang-toggle.js"></script>
+<script>
+const $=(s)=>document.querySelector(s); let filter='all', items=[];
+const LABEL={open:['排队中','queued'],running:['正在做','running'],blocked:['受阻','blocked'],done:['已完成','done']};
+function dedupe(list){
+  const seen = new Map();
+  list.forEach((x) => {
+    const k = (x.goal || '').trim();
+    const cur = seen.get(k);
+    if (!cur || (x.updated || x.created || 0) > (cur.updated || cur.created || 0)) seen.set(k, x);
+  });
+  return Array.from(seen.values());
+}
+function paint(){
+  document.documentElement.lang = lang()==='zh'?'zh-CN':'en'; applyI18n();
+  const q=($('#q').value||'').toLowerCase();
+  const rows=items.filter(x=>!q||(x.goal||'').toLowerCase().includes(q))
+    .filter(x=>filter==='all'||x.status===filter).slice().reverse().slice(0,60);
+  $('#list').innerHTML = rows.length? rows.map(x=>{
+    const st=LABEL[x.status]||['排队中','queued'];
+    const d=new Date((x.created||0)*1000);
+    let out='';
+    (x.done||[]).forEach((dd)=>{ const t=typeof dd==='string'?dd:JSON.stringify(dd);
+      const m=t.match(/([\w\u4e00-\u9fa5./~-]+\.(?:md|txt|py|js|html|json|pdf|docx|xlsx))/);
+      if(m&&!out) out=m[1]; });
+    const acts = '<span class="acts" style="display:inline-flex;gap:10px;align-items:center;flex:0 0 auto">' +
+      (out ? ('<span class="openOut" data-p="' + out + '" style="color:var(--ink2);cursor:pointer">' + (lang()==='zh'?'打开':'open') + '</span>' +
+              '<span class="openOut" data-p="' + out + '" data-reveal="1" style="color:var(--ink2);cursor:pointer">' + (lang()==='zh'?'文件夹':'folder') + '</span>') : '') +
+      (x.status === 'done' ? ('<span class="det" data-id="' + x.id + '" style="color:var(--ink2);cursor:pointer">' + (lang()==='zh'?'过程':'steps') + '</span>') : '') +
+      '<span class="retry" data-id="' + x.id + '" style="color:var(--pink);cursor:pointer">' + (lang()==='zh'?'重试':'retry') + '</span>' +
+      '<span class="del" data-id="' + x.id + '" style="color:var(--dim);cursor:pointer">' + (lang()==='zh'?'删除':'delete') + '</span></span>';
+    return '<div class="it ' + x.status + '" style="display:flex;gap:12px;align-items:flex-start;font-size:11.5px">' +
+      '<span class="dot" style="margin-top:6px"></span>' +
+      '<div class="body" style="flex:1;min-width:0"><b style="display:block;font-size:13px;font-weight:500;line-height:1.5">' +
+      (x.goal || '') + '</b><div class="meta" style="font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:2px">' +
+      st[lang()==='zh'?0:1] + ' · ' + d.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) +
+      (x.error ? (' · <span style="color:var(--pink)">' + (lang()==='zh'?'卡在：':'stuck: ') + x.error + '</span>') : '') +
+      '</div><div class="stepsBox" id="sb-' + x.id + '" style="display:none;font-size:11.5px;color:var(--ink2);line-height:1.8;margin-top:6px"></div></div>' +
+      acts + '</div>';
+  }).join('') : '<div class="empty">'+(lang()==='zh'?'暂无任务':'nothing here yet')+'</div>';
+}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  filter=t.dataset.f; document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===t)); paint();
+});
+$('#q').oninput=paint;
+document.addEventListener('click', async (e) => {
+  const op = e.target.closest && e.target.closest('.openOut');
+  if (op) {
+    const r = /[/\\.]/.test(op.dataset.p)
+      ? await postJSON('/open/path', {path: op.dataset.p, reveal: !!op.dataset.reveal})
+      : await postJSON('/open/find', {name: op.dataset.p, reveal: !!op.dataset.reveal});
+    if (r && !r.ok) alert((lang() === 'zh' ? '打不开：' : 'cannot open: ') + (r.error || ''));
+    return;
+  }
+  const sd = e.target.closest && e.target.closest('.det');
+  if (sd) {
+    const box = document.getElementById('sb-' + sd.dataset.id);
+    if (!box) return;
+    if (box.style.display === 'none') {
+      const it = items.find((x) => String(x.id) === String(sd.dataset.id)) || {};
+      const rows = [];
+      (it.steps || []).forEach((st, i) => rows.push((i + 1) + '. ' + (st.tool || '') + ' — ' + (st.why || '')));
+      (it.done || []).forEach((d, i) => rows.push('✓ ' + (typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 120)));
+      if (it.verify_out) rows.push('验收：' + String(it.verify_out).slice(0, 120));
+      box.innerHTML = rows.length ? rows.join('<br>') : '没有留下步骤记录';
+      box.style.display = 'block';
+    } else { box.style.display = 'none'; }
+    return;
+  }
+  const r0 = e.target.closest && e.target.closest('.retry');
+  if (r0) {
+    const res = await postJSON('/task/retry', {id: r0.dataset.id});
+    if (res && res.ok) {
+      items = items.map((x) => String(x.id) === String(r0.dataset.id) ? {...x, status: 'open'} : x);
+      paint(); stats();
+      const tip=document.getElementById('tip'); if(tip){tip.textContent=lang()==='zh'?'已放回队列':'back to queue';}
+    }
+    return;
+  }
+  const d = e.target.closest && e.target.closest('.del');
+  if (!d) return;
+  const r = await postJSON('/task/delete', {id: d.dataset.id});
+  if (r && r.ok) { items = items.filter((x) => String(x.id) !== String(d.dataset.id)); paint(); stats(); }
+});
+function stats(){
+  const c=(k)=>items.filter(x=>x.status===k).length;
+  $('#nRun').textContent=c('running'); $('#nWait').textContent=c('open');
+  $('#nBlock').textContent=c('blocked'); $('#nDone').textContent=c('done');
+}
+function paintArts(list){
+  const rows = (list||[]).slice(0, 8);
+  $('#arts').innerHTML = rows.length ? rows.map(x=>{
+    const d=new Date((x.t||0)*1000);
+    const p=String(x.path||x.rel||x.workdir||'');
+    const nm=String(x.title||x.task||x.rel||'（没名字）').slice(0,50);
+    return '<div class="it" style="display:flex;gap:10px;align-items:center;font-size:11.5px">'+
+      '<span class="dot"></span><div class="body" style="flex:1;min-width:0">'+
+      '<b style="display:block;font-size:13px;font-weight:500">'+ nm +'</b>'+
+      '<div class="meta" style="font-family:var(--mono);font-size:10.5px;color:var(--dim)">'+
+      String(x.kind||'file')+' · '+d.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})+'</div></div>'+
+      (p ? ('<span class="openOut" data-p="'+p+'" style="color:var(--ink2);cursor:pointer">'+(lang()==='zh'?'打开':'open')+'</span>'+
+      '<span class="openOut" data-p="'+p+'" data-reveal="1" style="color:var(--ink2);cursor:pointer">'+(lang()==='zh'?'文件夹':'folder')+'</span>') : '')+'</div>';
+  }).join('') : '<div class="empty">'+(lang()==='zh'?'还没有产物：让它写一次东西就会出现在这儿':'no outputs yet')+'</div>';
+}
+(async()=>{
+  const d=await getJSON('/task/list'); items=dedupe((d&&d.items)||[]);
+  mountTools({lang:paint}); paint(); stats();
+  try { const a=await getJSON('/artifacts'); paintArts((a&&a.items)||a||[]); } catch(e) {}
+})();
+</script></body></html>

@@ -1,0 +1,182 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Aster · 设置</title>
+<link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="shell.css">
+<link rel="stylesheet" href="settings.css">
+</head><body class="hasNav">
+<div class="dragbar"></div>
+<div class="set">
+  <h1 class="ptitle" data-zh="设置" data-en="Settings">设置</h1>
+  <p class="lead" data-zh="连接、外观、记忆与权限均在此页。" data-en="Connection, appearance, memory and permissions are all on this page.">连接、外观、记忆与权限均在此页。</p>
+
+  <div class="dark">
+    <h5 class="h5" data-zh="概览" data-en="Overview">概览</h5>
+    <div class="row2">
+      <div><div class="num pink" id="dEngine">—</div><div class="cap" data-zh="引擎" data-en="Engine">引擎</div></div>
+      <div><div class="num" id="dModel">7B</div><div class="cap" data-zh="判意图模型" data-en="Classifier">判意图模型</div></div>
+      <div><div class="num" id="dPerm">—</div><div class="cap" data-zh="权限" data-en="Permission">权限</div></div>
+    </div>
+  </div>
+  <section class="sect">
+    <h2 data-zh="连接" data-en="Connection">连接</h2>
+    <p class="note" data-zh="云端密钥仅用于对话与推理，保存于系统钥匙串，不写入配置文件。" data-en="The cloud key is only for talking and thinking; it lives in the keychain, not in config.">云端密钥仅用于对话与推理，保存于系统钥匙串，不写入配置文件。</p>
+    <div class="field"><label data-zh="云端密钥" data-en="Cloud key">云端密钥</label>
+      <input id="cloudKey" type="password" placeholder="sk-…">
+      <button class="btn ghost" id="saveKey" data-zh="保存" data-en="Save">保存</button></div>
+    <div class="field"><label data-zh="意图判定模型" data-en="Classifier">意图判定模型</label>
+      <select id="routerModel">
+        <option value="qwen2.5:7b">7B · 判得准（97%），每句约 0.8 秒</option>
+        <option value="qwen2.5:1.5b">1.5B · 快（0.25 秒），会多花点钱（90%）</option>
+      </select></div>
+    <div class="msg" id="cloudMsg"></div>
+  </section>
+
+
+  <section class="sect" id="cardPro">
+    <h2 data-zh="主动追问" data-en="Proactive">主动追问</h2>
+    <p class="note" data-zh="允许她在合适的时候问一句、把没记牢的事确认下来。只在情绪平稳、隔了一阵之后才可能开口。" data-en="She may ask a question now and then, only when calm and after a while.">允许她在合适的时候问一句、把没记牢的事确认下来。只在情绪平稳、隔了一阵之后才可能开口。</p>
+    <div style="display:flex;gap:10px;align-items:center">
+      <button class="btn" id="proToggle" data-zh="开启" data-en="On">开启</button>
+      <span class="note" id="proMsg"></span>
+    </div>
+  </section>
+
+  <section class="sect" id="cardPair">
+    <h2 data-zh="手机连接" data-en="Connect a phone">手机连接</h2>
+    <p class="note" data-zh="手机与这台电脑连同一个 Wi-Fi，用相机扫描下方二维码即可配对。" data-en="Same Wi-Fi, scan the code with the phone camera.">手机与这台电脑连同一个 Wi-Fi，用相机扫描下方二维码即可配对。</p>
+    <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
+      <div id="qrBox" style="width:164px;height:164px;border-radius:12px;background:#fff;border:1px solid var(--line2);display:grid;place-items:center;overflow:hidden">
+        <span style="font-size:11.5px;color:var(--dim)" data-zh="二维码加载中" data-en="loading">二维码加载中</span>
+      </div>
+      <div>
+        <div class="note" id="pairState" style="margin-bottom:10px" data-zh="等待手机扫描" data-en="waiting for scan">等待手机扫描</div>
+      <div id="wanBox" style="display:none;margin:0 0 12px;font-size:11.5px;color:var(--ink2);line-height:1.8"></div>
+      <div id="privBox" style="margin:0 0 12px;font-size:11.5px;color:var(--ink2);line-height:1.8"></div>
+      <button class="btn ghost" id="privBtn" data-zh="检测私有网络" data-en="Check private network">检测私有网络</button>
+        <button class="btn" id="pairRefresh" data-zh="刷新二维码" data-en="Refresh">刷新二维码</button>
+        <button class="btn ghost" id="pairReset" data-zh="断开" data-en="Unpair">断开</button>
+        <button class="btn ghost" id="wanBtn" data-zh="在外使用" data-en="Use remotely">在外使用</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="sect" id="cardPack">
+    <h2 data-zh="记忆包" data-en="Memory pack">记忆包</h2>
+    <p class="note" data-zh="可将完整记忆导出为压缩包，或从压缩包导入，用于迁移或备份。" data-en="Export the whole memory as a zip, or import one.">可将完整记忆导出为压缩包，或从压缩包导入，用于迁移或备份。</p>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button class="btn" id="packExport" data-zh="导出" data-en="Export">导出</button>
+      <button class="btn" id="packImport" data-zh="导入" data-en="Import">导入</button>
+      <button class="btn" id="packCheck" data-zh="检查" data-en="Check">检查</button>
+      <button class="btn" id="packFix" data-zh="修复" data-en="Fix">修复</button>
+      <input type="file" id="packFile" accept=".zip" style="display:none">
+      <span class="note" id="packMsg"></span>
+    </div>
+  </section>
+
+  <section class="sect" id="cardModel">
+    <h2 data-zh="本地模型" data-en="Local model">本地模型</h2>
+    <p class="note" data-zh="列出本机已安装的开源模型，自行选择；切换后需重启 Aster 生效。" data-en="Installed local models; switching takes effect after a restart.">列出本机已安装的开源模型，自行选择；切换后需重启 Aster 生效。</p>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <select id="modelPick" style="min-width:220px;height:32px;border-radius:9px;border:1px solid var(--line2);background:#fff;font-size:12.5px"></select>
+      <button class="btn" id="modelApply" data-zh="应用" data-en="Apply">应用</button>
+      <span class="note" id="modelMsg"></span>
+    </div>
+  </section>
+  <section class="sect">
+    <h2 data-zh="模型供应商" data-en="Model providers">模型供应商</h2>
+    <p class="note" data-zh="各家密钥不常改，收进面板里，设置页不必为它拉长。" data-en="Keys rarely change, so they live in a panel.">各家密钥不常改，收进面板里，设置页不必为它拉长。</p>
+    <button class="btn" id="openProv" data-zh="管理模型供应商" data-en="Manage providers">管理模型供应商</button>
+  </section>
+
+  <div id="provModal" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(12,12,14,.45)">
+    <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(720px,92vw);max-height:82vh;
+      background:#fff;border-radius:18px;border:1px solid var(--line2);display:flex;flex-direction:column;overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line2)">
+        <b style="font-size:14px" data-zh="模型供应商" data-en="Model providers">模型供应商</b>
+        <span id="closeProv" style="cursor:pointer;color:var(--dim);font-size:18px;line-height:1">×</span>
+      </div>
+      <div style="padding:16px 20px;overflow:auto">
+        <p class="note" style="margin-top:0" data-zh="每个供应商各自填自己的密钥，存进系统钥匙串；不填就不能用，填了也只是本机可用。"
+           data-en="Each provider uses its own key, kept in the system keychain.">每个供应商各自填自己的密钥，存进系统钥匙串；不填就不能用，填了也只是本机可用。</p>
+        <div id="provList"></div>
+      </div>
+    </div>
+  </div>
+
+  <section class="sect">
+    <h2 data-zh="外观与声音" data-en="Look &amp; sound">外观与声音</h2>
+    <div class="field"><label data-zh="语言" data-en="Language">语言</label>
+      <div class="seg" id="langSeg"><button data-l="zh">中文</button><button data-l="en">English</button></div></div>
+    <div class="field"><label data-zh="音乐" data-en="Music">音乐</label>
+      <div class="seg" id="musicSeg"><button data-m="1" data-zh="开" data-en="On">开</button><button data-m="0" data-zh="关" data-en="Off">关</button></div></div>
+    <p class="tip" data-zh="开场音乐沿用同一开关；进入主界面后音量降低，不中断对话。" data-en="The intro track follows the same switch; it drops low once you are inside.">开场音乐沿用同一开关；进入主界面后音量降低，不中断对话。</p>
+  </section>
+
+  <section class="sect">
+    <h2 data-zh="权限" data-en="Permissions">权限</h2>
+    <p class="note" data-zh="设定其可访问本机的范围。可随时调整，调整后立即生效。" data-en="How far it can touch your machine. Changeable anytime, effective immediately.">设定其可访问本机的范围。可随时调整，调整后立即生效。</p>
+    <div class="seg" id="permSeg">
+      <button data-p="1" data-zh="只读" data-en="Read only">只读</button>
+      <button data-p="2" data-zh="工作区内可修改" data-en="Edit within workspace">工作区内可修改</button>
+      <button data-p="3" data-zh="完全权限" data-en="Full access">完全权限</button>
+    </div>
+    <div class="msg" id="permMsg"></div>
+  </section>
+
+  <section class="sect">
+    <h2 data-zh="记忆与数据" data-en="Memory &amp; data">记忆与数据</h2>
+    <p class="note" data-zh="记忆保存于本机，可导出为数据包并迁移至其他设备。" data-en="Memory lives here; export it as a pack and move it to another machine.">记忆保存于本机，可导出为数据包并迁移至其他设备。</p>
+    <div class="row">
+      <button class="btn ghost" id="checkBtn" data-zh="检查" data-en="Check">检查</button>
+      <button class="btn ghost" id="fixBtn" data-zh="修复" data-en="Repair">修复</button>
+      <button class="btn ghost" id="exportBtn" data-zh="导出" data-en="Export">导出</button>
+      <button class="btn ghost" id="importBtn" data-zh="导入" data-en="Import">导入</button>
+    </div>
+    <div class="msg" id="memMsg"></div>
+  </section>
+
+  <section class="sect">
+    <h2 data-zh="关于" data-en="About">关于</h2>
+    <p class="tip" id="aboutLine">Aster · 一处数字个体的栖息之所</p>
+    <div id="diagBox" style="font-size:12px;color:var(--ink2);line-height:1.9;margin-top:10px"></div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn ghost" id="diagBtn" data-zh="运行自检" data-en="Run self-check">运行自检</button>
+      <button class="btn ghost" id="backBtn" data-zh="返回对话" data-en="Back to chat">返回对话</button>
+      <a class="btn ghost" href="guide.html" style="text-decoration:none;display:inline-flex;align-items:center"
+         data-zh="使用引导" data-en="Guide">使用引导</a>
+      <a class="btn ghost" href="intro.html?again=1" style="text-decoration:none;display:inline-flex;align-items:center"
+         data-zh="重新阅读开场合信" data-en="Read the opening letter again">重新阅读开场合信</a>
+    </div>
+  </section>
+  <section class="sect" id="cardUsage">
+    <h2><span class="dot"></span><span data-zh="用量" data-en="Usage">用量</span></h2>
+    <p data-zh="今日与近七日的模型调用次数、token 用量与平均耗时。" data-en="Model calls, token usage and average latency today and over the past seven days.">今日与近七日的模型调用次数、token 用量与平均耗时。</p>
+    <div id="usageBox" style="font-size:12.5px;line-height:1.9;color:var(--ink2)">—</div>
+  </section>
+
+  <section class="sect" id="cardBriefs">
+    <h2><span class="dot"></span><span data-zh="摘要快照" data-en="Briefs">摘要快照</span></h2>
+    <p data-zh="对话压缩后生成的摘要保存在此，用于维持上下文连续性。" data-en="Summaries produced when the conversation is compressed, kept for continuity.">对话压缩后生成的摘要保存在此，用于维持上下文连续性。</p>
+    <div id="briefBox" style="font-size:12.5px;line-height:1.9;color:var(--ink2)">—</div>
+    <div style="margin-top:10px"><button class="btn ghost" id="briefNow" data-zh="立即生成摘要" data-en="Generate summary">立即生成摘要</button></div>
+  </section>
+
+
+</div>
+
+<script src="i18n.js"></script><script src="api.js"></script><script src="nav.js"></script>
+<script src="lang-toggle.js"></script>
+<script src="settings.js"></script>
+
+<script>
+(function () {
+  const m = document.getElementById('provModal');
+  const open = document.getElementById('openProv');
+  const close = document.getElementById('closeProv');
+  if (open) open.onclick = () => { m.style.display = 'block'; };
+  if (close) close.onclick = () => { m.style.display = 'none'; };
+  if (m) m.addEventListener('click', (e) => { if (e.target === m) m.style.display = 'none'; });
+})();
+</script>
+
+
+</body></html>

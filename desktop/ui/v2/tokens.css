@@ -1,0 +1,19 @@
+:root{
+  --bg:#f1efeb; --card:#ffffff; --ink:#16171a; --ink2:#5f6167; --dim:#9a9aa1;
+  --line:#efece6; --line2:#eae6de; --pink:#e8173d; --pink-soft:#fdeef0;
+  --dark:#1b1c1f; --dark2:#232529; --paper:#f4f2ee;
+  --r:22px; --r-sm:12px;
+  --shadow:0 24px 60px rgba(24,24,28,.10), 0 2px 6px rgba(24,24,28,.05);
+  --shadow-sm:0 8px 24px rgba(24,24,28,.07);
+  --sans:"PingFang SC","Helvetica Neue",system-ui,sans-serif;
+  --mono:"SF Mono",Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;
+  font-variant-numeric:tabular-nums}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit}
+.card{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow)}
+.h5{margin:0 0 8px;font-family:var(--mono);font-size:10px;font-weight:400;letter-spacing:.14em;color:var(--dim)}
+.mono{font-family:var(--mono)}

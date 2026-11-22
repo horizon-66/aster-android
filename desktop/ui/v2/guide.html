@@ -1,0 +1,75 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Aster · 引导</title>
+<link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="shell.css">
+<style>
+ html,body{background:var(--bg);height:100%;margin:0}
+ .dragbar{position:fixed;left:0;top:0;right:0;height:30px;-webkit-app-region:drag;app-region:drag}
+ .wrap{max-width:760px;margin:0 auto;padding:70px 28px 90px;display:flex;flex-direction:column;gap:14px}
+ .head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+ .head span{letter-spacing:.22em;font-size:13px;font-weight:600}
+ .lead{font-size:12.5px;color:var(--ink2);line-height:1.9;margin:0 0 10px}
+ .card{background:#fff;border:1px solid var(--line2);border-radius:16px;padding:18px 20px;display:flex;gap:16px}
+ .idx{flex:0 0 22px;height:22px;border-radius:50%;background:#f4f1ec;color:var(--ink2);
+   display:flex;align-items:center;justify-content:center;font-size:11px}
+ .card h3{margin:0 0 6px;font-size:13.5px;font-weight:600}
+ .card p{margin:0;font-size:12px;color:var(--ink2);line-height:1.9}
+ .card p b{color:var(--ink);font-weight:600}
+ .foot{display:flex;align-items:center;gap:14px;margin-top:14px}
+ .btn{height:36px;padding:0 18px;border-radius:10px;border:1px solid var(--line2);background:#fff;font-size:13px;cursor:pointer;color:var(--ink)}
+ .btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+ .skip{font-size:12px;color:var(--dim);cursor:pointer}
+ .pink{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--pink);margin-right:6px;vertical-align:middle}
+</style></head><body>
+<div class="dragbar"></div>
+<div class="wrap">
+  <div class="head">
+    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#e8173d" stroke-width="1.5" stroke-linejoin="round"><path d="M12 2.6 13.8 10 21 12l-7.2 2L12 21.4 10.2 14 3 12l7.2-2Z"/></svg>
+    <span>ASTER</span>
+  </div>
+  <p class="lead" data-zh="首次使用，以下五项即可上手。若日后遗忘某一步骤，可从设置页重新打开本页。" data-en="Five things to get started. You can reopen this page from Settings.">首次使用，以下五项即可上手。若日后遗忘某一步骤，可从设置页重新打开本页。</p>
+
+  <div class="card"><div class="idx">1</div><div>
+    <h3><span class="pink"></span><span data-zh="开始对话" data-en="Just talk">开始对话</span></h3>
+    <p data-zh="在输入框中直接键入文字；左侧话筒图标用于语音输入，松开即发送。她会记住你先前提过的事，并在后续对话中延续。" data-en="Type in the box. Hold the mic to talk. She remembers what you said.">在输入框中直接键入文字；左侧话筒图标用于语音输入，松开即发送。她会记住你先前提过的事，并在后续对话中延续。</p>
+  </div></div>
+
+  <div class="card"><div class="idx">2</div><div>
+    <h3><span class="pink"></span><span data-zh="设定形象" data-en="Give her a face">设定形象</span></h3>
+    <p data-zh="于左栏「角色」页先确定一张基础形象，再按状态逐一生成照片，例如平静、愉快、生气、困倦等。生成完成后，右上角的头像将随其当前状态自动切换。" data-en="Under Character: pick one face, then generate a photo per state. The avatar follows her state.">于左栏「角色」页先确定一张基础形象，再按状态逐一生成照片，例如平静、愉快、生气、困倦等。生成完成后，右上角的头像将随其当前状态自动切换。</p>
+  </div></div>
+
+  <div class="card"><div class="idx">3</div><div>
+    <h3><span class="pink"></span><span data-zh="委托事务" data-en="Let her do work">委托事务</span></h3>
+    <p data-zh="以自然语言提出委托即可，例如「帮我完成一份方案」。她会将任务拆分为若干步骤，于「工作台」页依次执行；每一步的内容与受阻原因均可展开查看。" data-en="Ask in plain words. She splits it into steps and runs them on the Work page.">以自然语言提出委托即可，例如「帮我完成一份方案」。她会将任务拆分为若干步骤，于「工作台」页依次执行；每一步的内容与受阻原因均可展开查看。</p>
+  </div></div>
+
+  <div class="card"><div class="idx">4</div><div>
+    <h3><span class="pink"></span><span data-zh="记忆与数据" data-en="Memory is hers">记忆与数据</span></h3>
+    <p data-zh="对话内容与执行记录均保存在本机，不会上传。可在「记忆」页查阅与删除；涉及删除文件或支出费用时，她会先征询你的意见。" data-en="Everything stays on this machine. You can browse and delete memories; she asks before spending or deleting.">对话内容与执行记录均保存在本机，不会上传。可在「记忆」页查阅与删除；涉及删除文件或支出费用时，她会先征询你的意见。</p>
+  </div></div>
+
+  <div class="card"><div class="idx">5</div><div>
+    <h3><span class="pink"></span><span data-zh="接入自有模型" data-en="Bring your own model">接入自有模型</span></h3>
+    <p data-zh="于「设置」页填入各服务商的密钥，使用你本人的额度；未填写时默认使用本机模型。权限默认为「完全权限」，若希望每项操作先行确认，可调整为「先问再说」。" data-en="Put in your own keys under Settings. Permissions default to full; switch to ask-first if you prefer.">于「设置」页填入各服务商的密钥，使用你本人的额度；未填写时默认使用本机模型。权限默认为「完全权限」，若希望每项操作先行确认，可调整为「先问再说」。</p>
+  </div></div>
+
+  <div class="foot">
+    <button class="btn primary" id="go" data-zh="进入" data-en="Start">进入</button>
+    <span class="skip" id="skip" data-zh="稍后再说" data-en="Later">稍后再说</span>
+  </div>
+</div>
+<script src="i18n.js"></script><script src="lang-toggle.js"></script>
+<script>
+const $ = (s) => document.querySelector(s);
+function paint() {
+  const en = window.lang && lang() === 'en';
+  document.querySelectorAll('[data-zh]').forEach((el) => {
+    const t = en ? el.dataset.en : el.dataset.zh;
+    if (t) el.textContent = t;
+  });
+}
+paint();
+$('#go').onclick = () => { localStorage.setItem('aster.guide.done', '1'); location.href = 'index.html'; };
+$('#skip').onclick = () => { localStorage.setItem('aster.guide.done', '1'); location.href = 'index.html'; };
+mountTools({ lang: paint });
+</script></body></html>

@@ -1,0 +1,60 @@
+name: Windows EXE
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - "desktop/**"
+      - ".github/workflows/windows.yml"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 装引擎依赖并把运行时放进包内
+        shell: pwsh
+        working-directory: desktop
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --target engine/py/lib/site-packages requests qrcode pillow
+          $py = (Get-Command python).Source
+          $root = Split-Path (Split-Path $py)
+          Copy-Item -Recurse -Force $root engine/py
+          Copy-Item -Force $py engine/py/python.exe
+          New-Item -ItemType Directory -Force engine/bin | Out-Null
+
+      - name: 装前端依赖
+        working-directory: desktop
+        run: npm install
+
+      - name: 打 Windows 包
+        working-directory: desktop
+        run: npx electron-builder --win nsis --publish never
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: aster-windows
+          path: desktop/dist/*.exe
+
+      - name: 挂到 Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Aster build ${{ github.run_number }}
+          body: 自动构建的 Windows 安装包。
+          files: desktop/dist/*.exe
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

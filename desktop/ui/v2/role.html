@@ -1,0 +1,270 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Aster · 角色</title>
+<link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="shell.css"><link rel="stylesheet" href="pages.css">
+<style>
+ .wrap{max-width:900px;margin:0 0 0 240px;padding:52px 26px 90px;display:flex;flex-direction:column;gap:18px}
+ .card{background:#fff;border:1px solid var(--line2);border-radius:18px;padding:20px 22px}
+ .card h2{margin:0 0 6px;font-size:14.5px;font-weight:600;letter-spacing:.02em}
+ .card p{margin:0 0 16px;font-size:12px;color:var(--ink2);line-height:1.85}
+ .card h3{margin:26px 0 8px;font-size:13px;font-weight:600}
+ .bar{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+ .btn{height:32px;padding:0 14px;border-radius:9px;border:1px solid var(--line2);background:#fff;font-size:12.5px;color:var(--ink);cursor:pointer}
+ .btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+ .note{font-size:11.5px;color:var(--dim)}
+ .wall{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+ .face{position:relative;aspect-ratio:3/4;border-radius:12px;overflow:hidden;border:1px solid var(--line2);background:#f4f1ec;cursor:pointer}
+ .face img{width:100%;height:100%;object-fit:cover}
+ .face.on{outline:2px solid var(--pink);outline-offset:1px}
+ .face .lb{position:absolute;left:0;right:0;bottom:0;padding:3px 6px;font-size:10.5px;color:#fff;
+   background:linear-gradient(transparent,rgba(20,20,24,.62))}
+ .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+ .slot{border:1px solid var(--line2);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:8px}
+ .slot h4{margin:0;font-size:12px;font-weight:600}
+ .slot .ph{aspect-ratio:1;border-radius:10px;background:#f4f1ec;display:grid;place-items:center;color:#b9b5ad;font-size:11px;overflow:hidden}
+ .slot .ph img{width:100%;height:100%;object-fit:cover}
+ .slot button{height:28px;border-radius:8px;border:1px solid var(--line2);background:#fff;font-size:11.5px;cursor:pointer;color:var(--ink)}
+ .msg{font-size:12px;color:var(--ink2);min-height:18px;margin-top:8px}
+ textarea{width:100%;min-height:150px;padding:12px;border-radius:12px;border:1px solid var(--line2);font-size:12.5px;line-height:1.8;outline:none;font-family:var(--mono)}
+</style></head><body>
+<div class="dragbar"></div>
+<input type="file" id="faceFile" accept="image/*" style="display:none">
+<div class="wrap">
+  <div class="card">
+    <p data-zh="这是她的模样：脸、名字、性子，都在这一页。表情平时跟着心情自己换；点一张就定住一小时。" data-en="Her faces, name and temperament live here. Expressions follow her mood; tap one to lock it for an hour.">这是她的模样：脸、名字、性子，都在这一页。表情平时跟着心情自己换；点一张就定住一小时。</p>
+    <div class="bar">
+      <button class="btn" id="autoBtn" data-zh="交还给心情" data-en="Back to mood">交还给心情</button>
+      <span class="note" id="faceNow"></span>
+    </div>
+    <div class="wall" id="wall"></div>
+  </div>
+
+  <div class="card">
+    <h2 data-zh="生成角色" data-en="Generate">生成角色</h2>
+    <p data-zh="用你自己的生图 key（火山方舟）。key 存系统钥匙串，不写进配置文件。" data-en="Needs your own image key (Volcengine Ark). Stored in the system keychain.">用你自己的生图 key（火山方舟）。key 存系统钥匙串，不写进配置文件。</p>
+    <div class="bar">
+      <input id="imgKey" type="password" placeholder="粘贴你的生图 key" style="flex:1;height:34px;border:1px solid var(--line2);border-radius:9px;padding:0 12px;font-size:12.5px">
+      <button class="btn" id="keySave" data-zh="保存" data-en="Save">保存</button>
+    </div>
+    <div class="bar">
+      <input id="imgPrompt" placeholder="描述长相：深蓝短发、呆毛、白T、窗边" style="flex:1;height:34px;border:1px solid var(--line2);border-radius:9px;padding:0 12px;font-size:12.5px">
+      <button class="btn primary" id="imgGo" data-zh="生成一张" data-en="Generate">生成一张</button>
+    </div>
+    <div class="msg" id="genMsg"></div>
+
+    <h3 data-zh="定稿后：按这张脸生成表情" data-en="After locking: expressions from this face">定稿后：按这张脸生成表情</h3>
+    <div class="grid" id="slots"></div>
+    <div class="msg" id="exprMsg"></div>
+  </div>
+
+  <div class="card">
+    <h2 data-zh="声音" data-en="Voice">声音</h2>
+    <p data-zh="丢一段十秒以上的录音进来（安静环境、正常说话），之后就用这个音色念；不满意可以恢复默认。"
+       data-en="Drop a 10s+ recording (quiet room, natural speech) and it will speak in that voice. Restore anytime.">丢一段十秒以上的录音进来（安静环境、正常说话），之后就用这个音色念；不满意可以恢复默认。</p>
+    <div class="bar" style="gap:10px;flex-wrap:wrap">
+      <input type="file" id="vRef" accept="audio/*" style="display:none">
+      <button class="btn primary" id="vPick" data-zh="选择参考录音" data-en="Choose a clip">选择参考录音</button>
+      <button class="btn" id="vTest" data-zh="试听" data-en="Preview">试听</button>
+      <button class="btn" id="vReset" data-zh="恢复默认" data-en="Restore">恢复默认</button>
+      <span class="note" id="vMsg"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 data-zh="人格" data-en="Temperament">人格</h2>
+    <p data-zh="她怎么说话、什么脾气，都在这一段里。改完保存即可。" data-en="How she talks and her temper live in this text.">她怎么说话、什么脾气，都在这一段里。改完保存即可。</p>
+    <div class="bar" style="margin:12px 0 8px;gap:8px">
+      <span class="note" data-zh="名字" data-en="Name">名字</span>
+      <input id="nmInput" placeholder="还没起名" style="height:32px;min-width:180px;border:1px solid var(--line2);border-radius:9px;padding:0 10px;font-size:12.5px">
+      <button class="btn" id="nmSave" data-zh="保存" data-en="Save">保存</button>
+      <span class="note" id="nmMsg"></span>
+    </div>
+    <div class="bar" style="margin:0 0 10px;gap:8px">
+      <span class="note" data-zh="性别" data-en="Gender">性别</span>
+      <span class="tab gsel" data-g="female" data-zh="女生" data-en="Woman">女生</span>
+      <span class="tab gsel" data-g="male" data-zh="男生" data-en="Man">男生</span>
+      <span class="tab gsel" data-g="neutral" data-zh="不说" data-en="Prefer not">不说</span>
+      <span class="note" id="gMsg"></span>
+    </div>
+    <textarea id="psText"></textarea>
+    <div class="bar" style="margin-top:10px">
+      <button class="btn primary" id="psSave" data-zh="保存" data-en="Save">保存</button>
+      <button class="btn" id="psReset" data-zh="恢复出厂" data-en="Reset">恢复出厂</button>
+      <span class="note" id="psMsg"></span>
+    </div>
+  </div>
+</div>
+<script src="i18n.js"></script><script src="api.js"></script><script src="nav.js"></script><script src="lang-toggle.js"></script>
+<script>
+const $ = (s) => document.querySelector(s);
+const L = (zh, en) => (window.lang && lang() === 'en') ? en : zh;
+// 格子按引擎真实的「状态」来，不自己编名字
+// 格子 = 右上角那张「总表情」能显示的那些（来自已有表情清单），不自己造词
+let EXPRS = [];
+async function loadStates() {
+  const d = await fetch(API + '/face/states').then((r) => r.json()).catch(() => null);
+  const list = (d && d.states) || [];
+  EXPRS = list.map((x) => [x.name, x.path || '']);
+}
+let API = ''; let _upState = ''; let FACES = []; let LOCKED = '';
+
+async function loadWall() {
+  const f = await fetch(API + '/face').then((r) => r.json()).catch(() => null);
+  LOCKED = (f && f.face) ? f.face.replace(/\.jpg$/, '') : '';
+  $('#faceNow').textContent = (f && f.mood) ? L(('现在是：', '') + f.mood, 'now: ' + f.mood) : '';
+  const l = await fetch(API + '/face/list').then((r) => r.json()).catch(() => null);
+  FACES = (l && l.items) || [];
+  $('#wall').innerHTML = FACES.map((x) =>
+    '<div class="face ' + (x.file === LOCKED ? 'on' : '') + '" data-f="' + x.file + '" data-p="' + x.path + '">' +
+    '<img src="' + API + '/img?f=' + encodeURIComponent(x.path) + '&t=1">' +
+    '<span class="lb">' + (x.label || x.file) + '</span></div>').join('');
+  $('#wall').querySelectorAll('.face').forEach((el) => el.onclick = async () => {
+    await fetch(API + '/face/lock', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: el.dataset.p }) }).catch(() => null);
+    await loadWall();
+  });
+}
+
+async function loadSlots() {
+  if (!EXPRS.length) await loadStates();
+  const l = await fetch(API + '/face/list').then((r) => r.json()).catch(() => null);
+  const items = (l && l.items) || [];
+  const find = (zh) => items.find((x) => (x.label || '') === zh || (x.file || '') === zh) || null;
+  $('#slots').innerHTML = EXPRS.map(([zh, path]) => {
+    const hit = path ? { path } : find(zh);
+    return '<div class="slot" data-en="' + zh + '" data-state="' + zh + '"><h4>' + zh + '</h4>' +
+      '<div class="ph">' + (hit ? '<img src="' + API + '/img?f=' + encodeURIComponent(hit.path) + '&t=1">' : L('还没有','none')) + '</div>' +
+      '<div class="acts2" style="display:flex;gap:6px">' +
+      '<button class="gen" style="flex:1">' + (hit ? L('重生成','regenerate') : L('生成','generate')) + '</button>' +
+      '<button class="up" style="flex:1">' + L('上传','upload') + '</button></div></div>';
+  }).join('');
+  document.querySelectorAll('.slot').forEach((el) => {
+    el.querySelector('.gen').onclick = () => gen(el.dataset.state, el.dataset.state);
+    el.querySelector('.up').onclick = () => { _upState = el.dataset.state; document.getElementById('faceFile').click(); };
+    el.querySelector('.ph').style.cursor = 'pointer';
+    el.querySelector('.ph').onclick = () => { _upState = el.dataset.state; document.getElementById('faceFile').click(); };
+  });
+}
+
+async function gen(name, en) {
+  $('#exprMsg').textContent = L('正在生成「' + name + '」…', 'generating ' + en + '…');
+  const r = await fetch(API + '/imagegen/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt: en, expression: en, name: en, use_base: true }) }).then((x) => x.json()).catch(() => null);
+  if (!r || !r.ok) { $('#exprMsg').textContent = L('没成：','failed: ') + (r && r.error || ''); return; }
+  $('#exprMsg').textContent = L('好了','done');
+  await loadSlots();
+}
+
+(async function boot() {
+  document.getElementById('faceFile').onchange = async () => {
+    const f = document.getElementById('faceFile').files[0];
+    if (!f || !_upState) return;
+    const rd = new FileReader();
+    rd.onload = async () => {
+      const r = await fetch(API + '/face/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: _upState, data: rd.result }) }).then((x) => x.json()).catch(() => null);
+      $('#exprMsg').textContent = (r && r.ok) ? L('已换成你给的这张', 'uploaded') : L('上传失败：', 'upload failed: ') + (r && r.error || '');
+      await loadStates(); await loadSlots();
+    };
+    rd.readAsDataURL(f);
+  };
+  API = await findAPI();
+  await loadWall(); await loadSlots();
+  wireGender();
+  wireName();
+  wireVoice();
+  try { const p = await fetch(API + '/persona').then((r) => r.json()).catch(() => null);
+        if (p && p.text) $('#psText').value = p.text; } catch (e) {}
+  $('#autoBtn').onclick = async () => { await fetch(API + '/face/auto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => null); await loadWall(); };
+  $('#keySave').onclick = async () => {
+    const k = $('#imgKey').value.trim(); if (!k) return;
+    await fetch(API + '/imagegen/key', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: k }) });
+    $('#genMsg').textContent = L('key 已存','key saved');
+  };
+  $('#imgGo').onclick = async () => {
+    const p = $('#imgPrompt').value.trim(); if (!p) { $('#genMsg').textContent = L('写点长相描述','describe the look'); return; }
+    $('#genMsg').textContent = L('正在生成…','generating…');
+    const r = await fetch(API + '/imagegen/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: p, use_base: false }) }).then((x) => x.json()).catch(() => null);
+    $('#genMsg').textContent = (r && r.ok) ? L('好了，可在上面「脸墙」里选它','done') : L('没成：','failed: ') + (r && r.error || '');
+    await loadWall();
+  };
+function vSay(t){ const el=$('#vMsg'); if (el) el.textContent = t; }
+async function paintVoice(){
+  try {
+    const d = await fetch(API + '/voice/ref').then((r) => r.json()).catch(() => null);
+    vSay(d && d.custom ? L('已使用您的参考录音','using your voice') : L('默认音色','default voice'));
+  } catch (e) {}
+}
+function wireVoice(){
+  const pick = $('#vPick'), file = $('#vRef');
+  if (!pick || !file) return;
+  pick.onclick = () => file.click();
+  file.onchange = async () => {
+    const f = file.files && file.files[0];
+    if (!f) return;
+    vSay(L('正在上传…','uploading…'));
+    const rd = new FileReader();
+    rd.onload = async () => {
+      const r = await fetch(API + '/voice/ref', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: String(rd.result), ext: (f.name.split('.').pop() || 'wav') }) }).then((x) => x.json()).catch(() => null);
+      vSay(r && r.ok ? L('已更新，可点击试听','done — try preview') : L('操作失败：','failed: ') + ((r && r.error) || ''));
+    };
+    rd.readAsDataURL(f);
+  };
+  $('#vTest').onclick = async () => {
+    vSay(L('正在合成…','synthesizing…'));
+    const r = await fetch(API + '/tts?text=' + encodeURIComponent('你听，这是我的声音。')).then((x) => x.json()).catch(() => null);
+    if (r && r.ok) { new Audio(API + '/audio?f=' + encodeURIComponent(r.path)).play().catch(() => {}); vSay(L('用的是 ' + (r.engine || ''),'engine ' + (r.engine || ''))); }
+    else vSay(L('合成失败','tts failed'));
+  };
+  $('#vReset').onclick = async () => {
+    await fetch(API + '/voice/ref', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reset: 1 }) }).catch(() => null);
+    paintVoice();
+  };
+  paintVoice();
+}
+async function wireName(){
+  try {
+    const d = await fetch(API + '/identity').then((x) => x.json()).catch(() => null);
+    if (d && d.assistant) $('#nmInput').value = d.assistant;
+  } catch (e) {}
+  $('#nmSave').onclick = async () => {
+    const n = ($('#nmInput').value || '').trim();
+    if (!n) { $('#nmMsg').textContent = L('名字不能空','cannot be empty'); return; }
+    const r = await fetch(API + '/identity/name?name=' + encodeURIComponent(n)).then((x) => x.json()).catch(() => null);
+    $('#nmMsg').textContent = (r && r.ok) ? L('记住了','saved') : L('没存上','failed');
+  };
+}
+function paintGender(cur) {
+  document.querySelectorAll('.gsel').forEach((el) => {
+    el.classList.toggle('on', (el.dataset.g || '') === (cur || ''));
+  });
+}
+async function wireGender() {
+  try {
+    const d = await fetch(API + '/identity').then((r) => r.json()).catch(() => null);
+    paintGender((d && d.gender) || '');
+  } catch (e) {}
+  document.querySelectorAll('.gsel').forEach((el) => {
+    el.onclick = async () => {
+      const g = el.dataset.g || '';
+      const r = await fetch(API + '/identity/gender?g=' + encodeURIComponent(g)).then((x) => x.json()).catch(() => null);
+      if (r && r.ok) { paintGender(g); if (window.setGender) window.setGender(g); $('#gMsg').textContent = L('已记住','saved'); }
+      else $('#gMsg').textContent = L('没存上','failed');
+    };
+  });
+}
+$('#psSave').onclick = async () => {
+    const t = $('#psText').value;
+    const r = await fetch(API + '/persona', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: t }) }).then((x) => x.json()).catch(() => null);
+    $('#psMsg').textContent = (r && r.ok) ? L('已保存','saved') : L('保存失败','failed');
+  };
+  $('#psReset').onclick = async () => {
+    const r = await fetch(API + '/persona', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: '' }) }).then((x) => x.json()).catch(() => null);
+    $('#psMsg').textContent = (r && r.ok) ? L('已恢复出厂','reset') : L('失败','failed');
+    const p2 = await fetch(API + '/persona').then((x) => x.json()).catch(() => null);
+    if (p2 && p2.text) $('#psText').value = p2.text;
+  };
+})();
+</script></body></html>

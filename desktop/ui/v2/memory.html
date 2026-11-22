@@ -1,0 +1,96 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Aster · 记忆</title>
+<link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="shell.css">
+<link rel="stylesheet" href="pages.css">
+</head><body class="hasNav">
+<div class="dragbar"></div>
+<div class="page">
+  <h1 class="ptitle" data-zh="记忆" data-en="Memory">记忆</h1>
+  <p class="lead" id="count"></p>
+  <div class="dark">
+    <h5 class="h5" data-zh="概览" data-en="Overview">概览</h5>
+    <div class="row2">
+      <div><div class="num pink" id="nAll">0</div><div class="cap" data-zh="全部条目" data-en="Entries">全部条目</div></div>
+      <div><div class="num" id="nWeek">0</div><div class="cap" data-zh="近七日" data-en="Last 7 days">近七日</div></div>
+      <div><div class="num" id="nTag">0</div><div class="cap" data-zh="分类数" data-en="Tags">分类数</div></div>
+    </div>
+  </div>
+  <div class="panel">
+    <h2 style="margin:0 0 6px" data-zh="纪念日" data-en="Dates">纪念日</h2>
+    <p class="lead" style="margin:0 0 10px" id="msLead"></p>
+    <div id="msList" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+    <h2 style="margin:14px 0 6px" data-zh="共同经历" data-en="Firsts">共同经历</h2>
+    <div id="msFirsts" style="font-size:12px;color:var(--ink2);line-height:1.9"></div>
+  </div>
+  <div class="panel" style="display:flex;align-items:center;gap:16px">
+    <div style="flex:1">
+      <h2 style="margin:0 0 4px" data-zh="记忆脑图" data-en="Memory map">记忆脑图</h2>
+      <p class="lead" style="margin:0" data-zh="将全部记忆呈现为星图：越新越亮，按身份、关系、事件、细节、偏好与项目分区。"
+         data-en="Every memory on one star map: nearer is brighter, split into identity, bonds, events, details, habits, projects.">将全部记忆呈现为星图：越新越亮，按身份、关系、事件、细节、偏好与项目分区。</p>
+    </div>
+    <a class="tab on" id="mapBtn" data-zh="打开记忆脑图" data-en="Open memory map">打开记忆脑图</a>
+  </div>
+  <div class="toolbar">
+    <input class="search" id="q" data-zh-ph="搜索记忆内容…" data-en-ph="Search memory…" placeholder="搜索记忆内容…">
+
+    <a class="tab" href="settings.html" data-zh="检查与修复" data-en="Check &amp; repair">检查与修复</a>
+  </div>
+  <div class="panel"><div class="list" id="list"></div></div>
+</div>
+<script src="i18n.js"></script><script src="api.js"></script><script src="nav.js"></script>
+<script src="lang-toggle.js"></script>
+<script>
+const $=(s)=>document.querySelector(s); let items=[];
+function paint(){
+  document.documentElement.lang = lang()==='zh'?'zh-CN':'en'; applyI18n();
+  const q=($('#q').value||'').toLowerCase();
+  const rows=items.filter(x=>!q||String(x.text||'').toLowerCase().includes(q)).slice().reverse().slice(0,80);
+  $('#count').textContent = lang()==='zh' ? ('主库共 '+(window.__total||items.length)+' 条；这里按时间倒序显示最近 80 条，每条能删') :
+    ((window.__total||items.length)+' entries; newest 80, each deletable');
+  const SUB={self:'他自己',other:'别人',relational:'他的人'};
+  $('#list').innerHTML = rows.length? rows.map(x=>{
+    const d=new Date((x.ts||0)*1000);
+    const who = x.subject==='self' ? '他本人' : (x.subject==='other' ? '第三方' : ('他的'+String(x.subject||'')));
+    return '<div class="it"><span class="dot"></span><div class="body"><b>'+
+      String(x.text||'').slice(0,90)+'</b><div class="meta">'+(x.tag||'')+' · '+who+
+      (x.src?' · '+String(x.src).slice(0,14):'')+' · '+
+      d.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})+
+      ' · <a href="javascript:void 0" class="del" data-id="'+(x.id||'')+'">删</a></div></div></div>';
+  }).join('') : '<div class="empty">'+(lang()==='zh'?'暂无记忆条目':'nothing remembered yet')+'</div>';
+  document.querySelectorAll('#list .del').forEach(a=>{
+    a.onclick=async()=>{
+      const base=await findAPI(); if(!base) return;
+      const r=await fetch(base+'/memory/del',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:a.dataset.id})}).then(x=>x.json()).catch(()=>null);
+      if(r&&r.ok){ items=items.filter(y=>y.id!==a.dataset.id); paint(); }
+      else alert(lang()==='zh'?'没删掉':'delete failed');
+    };
+  });
+}
+$('#q').oninput=paint;
+(async function paintMilestones(){
+  try {
+    const m = await getJSON('/milestones');
+    if (!m || !m.ok) return;
+    $('#msLead').textContent = (lang()==='zh' ? '你们认识第 ' + m.days + ' 天。' : 'Day ' + m.days + ' together.');
+    const ups = (m.upcoming || []).slice(0, 3);
+    $('#msList').innerHTML = ups.length ? ups.map((u) => {
+      const d = new Date((u.at || 0) * 1000);
+      const when = u.days <= 0 ? (lang()==='zh'?'今天':'today') : (lang()==='zh'? u.days + ' 天后' : 'in ' + u.days + 'd');
+      return '<span class="chip" style="border:1px solid var(--line2);border-radius:99px;padding:4px 10px;font-size:11.5px;color:var(--ink2)">' +
+        u.name + ' · ' + when + ' · ' + d.toLocaleDateString('zh-CN', {month:'2-digit',day:'2-digit'}) + '</span>';
+    }).join('') : '<span style="font-size:12px;color:var(--dim)">' + (lang()==='zh'?'最近没有纪念日':'nothing soon') + '</span>';
+    const fs = (m.firsts || []).slice(0, 8);
+    $('#msFirsts').innerHTML = fs.length ? fs.map((f) => {
+      const d = new Date((f.at || 0) * 1000);
+      return '<div>' + d.toLocaleDateString('zh-CN', {month:'2-digit',day:'2-digit'}) + ' · ' + (f.note || f.key) + '</div>';
+    }).join('') : (lang()==='zh'?'还没有值得记下的第一次':'no firsts yet');
+  } catch (e) {}
+})();
+(async()=>{const d=await getJSON('/memory'); items=(d&&d.items)||[]; window.__total=(d&&d.total)||items.length; mountTools({lang:paint}); paint();
+  const wk=(Date.now()/1000)-7*86400;
+  $('#nAll').textContent=items.length;
+  $('#nWeek').textContent=items.filter(x=>(x.ts||0)>wk).length;
+  $('#nTag').textContent=new Set(items.map(x=>x.tag).filter(Boolean)).size;
+  const base=await findAPI(); const b=$('#mapBtn'); if(b) b.href=(base||'')+'/brain-map';})();
+</script></body></html>

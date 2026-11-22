@@ -1,0 +1,50 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Aster · 技能</title>
+<link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="shell.css">
+<link rel="stylesheet" href="pages.css">
+</head><body class="hasNav">
+<div class="dragbar"></div>
+<div class="page">
+  <h1 class="ptitle" data-zh="技能" data-en="Skills">技能</h1>
+  <p class="lead" data-zh="可执行的技能列于上方；仅影响对话的说明列于下方。" data-en="Executable things on top; notes that shape the conversation below.">可执行的技能列于上方；仅影响对话的说明列于下方。</p>
+  <div class="dark">
+    <h5 class="h5" data-zh="概览" data-en="Overview">概览</h5>
+    <div class="row2">
+      <div><div class="num pink" id="nExe">0</div><div class="cap" data-zh="可执行" data-en="Executable">可执行</div></div>
+      <div><div class="num" id="nPrompt">0</div><div class="cap" data-zh="影响对话" data-en="Shapes dialogue">影响对话</div></div>
+      <div><div class="num" id="nOn">0</div><div class="cap" data-zh="已启用" data-en="Enabled">已启用</div></div>
+    </div>
+  </div>
+  <div class="panel"><h2 data-zh="可执行" data-en="Executable">可执行</h2><div id="plugins"></div></div>
+  <div class="panel"><h2 data-zh="影响对话" data-en="Shapes the dialogue">影响对话</h2><div id="prompts"></div></div>
+  <div class="panel"><h2 data-zh="安装新技能" data-en="Install">安装新技能</h2>
+    <div class="toolbar">
+      <input class="search" id="repo" placeholder="owner/repo">
+      <button class="tab on" id="installBtn" data-zh="从 GitHub 安装" data-en="Install from GitHub">从 GitHub 安装</button>
+    </div>
+    <div class="empty" id="instMsg"></div>
+  </div>
+</div>
+<script src="i18n.js"></script><script src="api.js"></script><script src="nav.js"></script>
+<script src="lang-toggle.js"></script>
+<script>
+const $=(s)=>document.querySelector(s); let data={items:[],skills:[],prompts:[]};
+function paint(){
+  document.documentElement.lang = lang()==='zh'?'zh-CN':'en'; applyI18n();
+  $('#plugins').innerHTML = (data.items||[]).map(p=>'<div class="skill"><div><b>'+p.name+'</b><div class="d">'+
+    (p.description||'')+'</div></div><span class="btn ghost">'+(p.enabled?(lang()==='zh'?'已启用':'on'):(lang()==='zh'?'已停用':'off'))+'</span></div>').join('')
+    || '<div class="empty">'+(lang()==='zh'?'还没装可执行':'none yet')+'</div>';
+  $('#prompts').innerHTML = (data.prompts||[]).map(s=>'<div class="skill"><div><b>'+(s.title||s.name)+'</b><div class="d">'+
+    (s.desc||'')+'</div></div></div>').join('') || '<div class="empty">—</div>';
+}
+$('#installBtn').onclick = async () => {
+  const r=$('#repo').value.trim(); if(!r) return;
+  $('#instMsg').textContent = lang()==='zh'?'正在安装…':'installing…';
+  const d=await postJSON('/ext/install_github',{repo:r});
+  $('#instMsg').textContent = d&&d.ok ? (d.result||'ok') : ((d&&d.error)||'failed');
+};
+(async()=>{const d=await getJSON('/ext/list'); data=d||data; mountTools({lang:paint}); paint();
+  $('#nExe').textContent=(data.items||[]).length;
+  $('#nPrompt').textContent=(data.prompts||[]).length;
+  $('#nOn').textContent=(data.items||[]).filter(x=>x.enabled).length;})();
+</script></body></html>

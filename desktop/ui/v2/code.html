@@ -1,0 +1,297 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Aster · 议事</title>
+<link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="shell.css"><link rel="stylesheet" href="pages.css">
+</head><body class="hasNav">
+<div class="page">
+  <h1 class="ptitle" style="font-size:17px" data-zh="编码" data-en="Coding">编码</h1>
+  <p class="lead" style="font-size:11.5px;margin-bottom:14px" data-zh="给一个任务，几家模型各写一版、互相挑漏洞，最后收敛成一版；每一步都留痕，可以退回。"
+     data-en="Give a task; several models each draft, then poke holes in each other, then converge. Every step is kept and can be rolled back.">同一个议题，几家不同的模型各自站着说；说完由记录者出三块：共识、分歧、建议。</p>
+
+  <div class="panel">
+    <div class="field" style="display:flex;gap:8px;margin-bottom:10px">
+      <input id="topic" class="search" data-zh-ph="任务，比如：写一个清理过期日志的脚本，带 dry-run"
+             data-en-ph="Task, e.g. a script that removes stale logs, with dry-run"
+             placeholder="任务，比如：写一个清理过期日志的脚本，带 dry-run">
+      <select id="rounds" style="background:#fff;border:1px solid var(--line2);border-radius:11px;padding:9px 10px;font-size:13px">
+        <option value="1">1 轮</option><option value="2">2 轮</option><option value="3" selected>3 轮</option><option value="5">5 轮</option>
+      </select>
+      <input id="budget" type="number" step="0.5" min="0" placeholder="预算 ¥" title="预算上限，超了就停"
+             style="width:92px;background:#fff;border:1px solid var(--line2);border-radius:11px;
+             padding:9px 10px;font-size:13px;outline:none">
+    </div>
+    <div class="msg" style="font-size:11px;margin:-2px 0 10px 2px"
+         data-zh="作者先写，其余人只挑漏；最多五轮，然后收敛成一版" data-en="One drafts, the rest poke holes; up to five rounds, then converge">作者先写，其余人只挑漏；最多五轮，然后收敛成一版</div>
+    <div id="seats"></div>
+    <div style="display:flex;gap:8px;margin-top:14px;align-items:center">
+      <button id="runBtn" style="height:32px;padding:0 16px;border:0;border-radius:10px;background:var(--ink);-webkit-appearance:none;
+        color:var(--paper);font-size:12.5px;cursor:pointer" data-zh="开始" data-en="Start">开始</button>
+      <button id="stopBtn" style="display:none;height:32px;padding:0 16px;border:1px solid rgba(232,23,61,.4);
+        border-radius:10px;background:#fff;color:var(--pink);font-size:12.5px;cursor:pointer"
+        data-zh="停下" data-en="Stop">停下</button>
+      <span class="msg" id="state" style="font-size:11.5px"></span>
+    </div>
+    <div id="sayRow" style="display:none;gap:8px;margin-top:10px;align-items:center">
+      <input id="sayInput" style="flex:1;background:#fff;border:1px solid var(--line2);border-radius:10px;
+        padding:8px 11px;font-size:12.5px;outline:none"
+        data-zh-ph="插一句：要他们下一轮必须回应的话" data-en-ph="Say something they must answer next round"
+        placeholder="插一句：要他们下一轮必须回应的话">
+      <button id="sayBtn" style="height:30px;padding:0 13px;border:0;border-radius:9px;background:var(--ink);
+        color:var(--paper);font-size:12px;cursor:pointer" data-zh="送到" data-en="Send">送到</button>
+    </div>
+  </div>
+
+  <div id="out"></div>
+</div>
+<script src="i18n.js"></script><script src="api.js"></script><script src="nav.js"></script>
+<script src="lang-toggle.js"></script>
+<script>
+const $ = (s) => document.querySelector(s);
+function md(t) {
+  const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const parts = String(t || '').split(/```/);
+  return parts.map((part, i) => {
+    if (i % 2 === 1) {
+      const body = part.replace(/^[a-zA-Z0-9+#-]*\n?/, '');
+      return '<pre style="background:#f7f5f1;border-radius:10px;padding:12px 14px;overflow:auto;' +
+        'font:12px/1.7 var(--mono);margin:10px 0">' + esc(body) + '</pre>';
+    }
+    return esc(part)
+      .replace(/^### (.*)$/gm, '<h4 style="margin:14px 0 6px;font-size:13px">$1</h4>')
+      .replace(/^## (.*)$/gm, '<h3 style="margin:16px 0 8px;font-size:14px">$1</h3>')
+      .replace(/^# (.*)$/gm, '<h2 style="margin:6px 0 10px;font-size:16px">$1</h2>')
+      .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+      .replace(/`([^`]+)`/g, '<code style="background:#f4f1ec;border-radius:4px;padding:1px 5px">$1</code>')
+      .replace(/^- (.*)$/gm, '· $1')
+      .replace(/\n/g, '<br>');
+  }).join('');
+}
+let provs = [], picked = [];
+const ROLES = {
+  zh: ['增长派', '风控派', '用户视角', '工程现实派'],
+  en: ['Growth', 'Risk control', 'User view', 'Engineering reality']
+};
+function paint() {
+  document.documentElement.lang = lang() === 'zh' ? 'zh-CN' : 'en';
+  applyI18n();
+  const zh = lang() === 'zh';
+  const usable = provs.filter((p) => p.has_key);
+  const ROLE_OPTS = mode === 'produce'
+    ? {zh: ['作者', '评审', '评审2'], en: ['Author', 'Reviewer', 'Reviewer 2']} : ROLES;
+  const opts = ROLE_OPTS[lang()] || ROLE_OPTS.zh;
+  if (!picked.length || picked._mode !== mode) {
+    picked = usable.slice(0, 2).map((p, i) => ({provider: p.name, role: mode === 'produce' ? (opts[i] || '') : ''}));
+    picked._mode = mode;
+  }
+
+  // 一行芯片：名字 + 立场下拉 + 移除
+  $('#seats').innerHTML = picked.map((x, idx) => {
+    const p = provs.find((q) => q.name === x.provider) || {label: x.provider};
+    const ro = '<option value=""' + (!x.role ? ' selected' : '') + '>' + (zh ? '独立' : 'neutral') + '</option>' +
+      opts.map((o) => '<option ' + (o === x.role ? 'selected' : '') + '>' + o + '</option>').join('');
+    return '<span class="chipseat" data-p="' + x.provider + '" data-i="' + idx + '" style="display:inline-flex;align-items:center;gap:6px;' +
+      'background:#fff;border:1px solid var(--line2);border-radius:999px;padding:4px 6px 4px 12px;font-size:12px;' +
+      'margin:0 6px 6px 0">' + p.label +
+      '<select class="pr" style="border:0;background:transparent;font-size:11.5px;color:var(--pink);outline:none">' +
+      ro + '</select>' +
+      '<span class="rm" style="cursor:pointer;color:var(--dim);padding:0 4px">×</span></span>';
+  }).join('') + '<span id="addBtn" style="display:inline-flex;align-items:center;height:26px;padding:0 11px;' +
+    'border-radius:999px;border:1px dashed var(--line2);font-size:12px;color:var(--ink2);cursor:pointer">' +
+    (zh ? '+ 添加' : '+ add') + '</span>' +
+    '<span id="cloneBtn" style="display:inline-flex;align-items:center;height:26px;padding:0 11px;' +
+    'border-radius:999px;border:1px dashed var(--line2);font-size:12px;color:var(--ink2);cursor:pointer">' +
+    (zh ? '＋分身（同一模型两个 Agent）' : '＋clone (two agents, one model)') + '</span>';
+
+  $('#seats').querySelectorAll('.chipseat').forEach((chip) => {
+    const name = chip.dataset.p;
+    chip.querySelector('.pr').onchange = (e) => {
+      const it = picked[Number(chip.dataset.i)]; if (it) it.role = e.target.value;
+    };
+    chip.querySelector('.rm').onclick = () => {
+      picked.splice(Number(chip.dataset.i), 1); picked._mode = mode; paint();
+    };
+  });
+  const add = document.getElementById('addBtn');
+  if (add) add.onclick = (e) => { e.stopPropagation(); togglePicker(); };
+  const clone = document.getElementById('cloneBtn');
+  if (clone) clone.onclick = (e) => {
+    e.stopPropagation();
+    const base = picked[0]; if (!base) return;
+    picked.push({provider: base.provider, role: opt[picked.length] || opt[1], clone: true});
+    picked._mode = mode; paint();
+  };
+}
+
+function togglePicker() {
+  const old = document.getElementById('picker');
+  if (old) { old.remove(); return; }
+  const zh = lang() === 'zh';
+  const groups = {};
+  provs.forEach((p) => { (groups[p.group || '其他'] = groups[p.group || '其他'] || []).push(p); });
+  const box = document.createElement('div');
+  box.id = 'picker';
+  box.style.cssText = 'position:absolute;z-index:95;margin-top:6px;width:min(520px,92vw);max-height:340px;overflow:auto;' +
+    'background:#fff;border:1px solid var(--line2);border-radius:14px;box-shadow:var(--shadow);padding:10px 12px;' +
+    'font:12px var(--sans)';
+  box.innerHTML = Object.keys(groups).map((g) => {
+    const rows = groups[g].map((p) => {
+      const on = picked.some((q) => q.provider === p.name);
+      return '<label style="display:flex;gap:8px;align-items:center;padding:4px 0;opacity:' + (p.has_key ? 1 : .5) + '">' +
+        '<input type="checkbox" data-p="' + p.name + '" ' + (on ? 'checked' : '') + (p.has_key ? '' : ' disabled') + '>' +
+        '<span style="flex:1">' + p.label + '</span>' +
+        '<span style="font-family:var(--mono);font-size:10px;color:var(--dim)">' + (p.has_key ? (p.model || '') :
+          (zh ? '未填 key' : 'no key')) + '</span></label>';
+    }).join('');
+    return '<div style="margin:8px 0 2px;font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--dim)">' +
+      g + '</div>' + rows;
+  }).join('');
+  const host = document.getElementById('seats');
+  host.parentElement.style.position = 'relative';
+  host.parentElement.appendChild(box);
+  box.querySelectorAll('input[data-p]').forEach((cb) => {
+    cb.onchange = () => {
+      const name = cb.dataset.p;
+      if (cb.checked) picked.push({provider: name, role: mode === 'produce' ? (optsNow()[picked.length] || '') : ''});
+      else picked = picked.filter((q) => q.provider !== name);
+      picked._mode = mode; paint();
+      const p2 = document.getElementById('picker'); if (p2) { p2.remove(); togglePicker(); }
+    };
+  });
+  document.addEventListener('click', function close(ev) {
+    if (!box.contains(ev.target) && !ev.target.closest('#addBtn')) {
+      box.remove(); document.removeEventListener('click', close);
+    }
+  });
+}
+
+function optsNow() {
+  const R = mode === 'produce' ? {zh: ['作者', '评审', '评审2'], en: ['Author', 'Reviewer', 'Reviewer 2']} : ROLES;
+  return R[lang()] || R.zh;
+}
+async function load() {
+  const d = await getJSON('/providers');
+  provs = (d && d.items) || [];   // 全部列出来；没填 key 的灰着，给一条去填的入口
+  paint();
+}
+let curJob = null, pollTimer = null;
+function renderLive(st) {
+  const zh = lang() === 'zh';
+  if (st.state === 'running') {
+    const done = (st.steps || []).length;
+    $('#state').textContent = (zh ? '进行中 · 已经 ' : 'running · ') + done + (zh ? ' 步' : ' steps');
+    renderSteps(st);
+    return;
+  }
+  $('#runBtn').style.display = '';
+  $('#stopBtn').style.display = 'none';
+  $('#sayRow').style.display = 'none';
+  const tk = st.tokens || {};
+  const lint = st.lint || {};
+  const bad = Object.keys(lint).filter((k) => lint[k] !== 'ok');
+  $('#state').textContent = (zh ? '用了 ' : 'took ') + ((st.ms || 0) / 1000).toFixed(1) + 's · ' +
+    (st.steps || []).length + (zh ? ' 步 · ' : ' steps · ') + ((tk.in || 0) + (tk.out || 0)) + ' tokens · ¥' +
+    Number(st.cost || 0).toFixed(4) + (st.budget ? (zh ? ' / 预算 ¥' : ' / budget ¥') + st.budget : '') +
+    (bad.length ? (zh ? ' · 语法没过：' : ' · syntax fails: ') + bad.join('、') : (Object.keys(lint).length ? (zh ? ' · 语法都过' : ' · syntax ok') : '')) +
+    (st.stop_reason ? ' · ' + st.stop_reason : (st.stop ? (zh ? ' · 你叫停了' : ' · stopped') : ''));
+  renderSteps(st);
+}
+function renderPlan(st) {
+  const zh = lang() === 'zh';
+  const plan = st.plan || [];
+  if (!plan.length) return '';
+  const done = plan.filter((x) => x.done).length;
+  return '<div class="panel"><h2>' + (zh ? '方案 · ' : 'Plan · ') + done + ' / ' + plan.length +
+    '</h2>' + plan.map((x) => '<label style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;' +
+      'border-top:1px solid #f4f1ec">' +
+      '<input type="checkbox" class="plchk" data-id="' + x.id + '" ' + (x.done ? 'checked' : '') +
+      ' style="margin-top:3px">' +
+      '<span style="flex:1"><b style="font-size:12.5px;font-weight:500">' + x.text + '</b>' +
+      '<span style="display:block;font-size:11.5px;color:var(--dim);margin-top:2px">' +
+      (zh ? '验收：' : 'accept: ') + x.accept + '</span></span></label>').join('') +
+    '</div>';
+}
+function renderSteps(st) {
+  const zh = lang() === 'zh';
+  const steps = st.steps || [];
+  const html = steps.map((x) => '<div class="panel" style="padding:14px 16px">' +
+    '<div style="display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--dim)">' +
+    '<span style="font-family:var(--mono)">#' + x.n + '</span>' +
+    '<span style="color:var(--ink)">' + (x.role || '') + '</span><span>' + x.who + '</span>' +
+    '<span style="margin-left:auto">' + ((x.tokens && (x.tokens.in + x.tokens.out)) || 0) + ' tokens · ¥' +
+      Number(x.cost || 0).toFixed(4) + '</span></div>' +
+    '<div style="font:13px/1.9 var(--sans);margin-top:8px"><p style="margin:6px 0">' + md(x.text) + '</p></div></div>').join('');
+  const snaps = (st.snaps || []).map((sn) =>
+    '<div style="display:inline-flex;gap:8px;align-items:center;margin:0 8px 8px 0;background:#fff;' +
+    'border:1px solid var(--line2);border-radius:999px;padding:5px 12px;font-size:12px">' + sn.label +
+    '<span class="rb" data-label="' + sn.round + '" style="color:var(--pink);cursor:pointer">' +
+    (zh ? '回到这步' : 'restore') + '</span></div>').join('');
+  const files = (st.files || []).length ? '<div class="msg" style="font-size:11.5px">' +
+    (zh ? '写出的文件：' : 'files: ') + (st.files || []).join('、') + '</div>' : '';
+  $('#out').innerHTML = renderPlan(st) + (snaps ? '<div class="panel"><h2>' + (zh ? '快照 · 可回滚' : 'Snapshots') + '</h2>' + snaps + files + '</div>' : '') + html;
+  $('#out').querySelectorAll('.plchk').forEach((c) => {
+    c.onchange = async () => {
+      await postJSON('/code/toggle', {id: curJob, item: c.dataset.id, done: c.checked});
+    };
+  });
+  $('#out').querySelectorAll('.rb').forEach((b) => {
+    b.onclick = async () => {
+      const r = await postJSON('/code/rollback', {id: curJob, label: b.dataset.label});
+      b.textContent = r && r.ok ? (zh ? '已回滚' : 'restored') : (zh ? '失败' : 'failed');
+    };
+  });
+}
+async function poll() {
+  if (!curJob) return;
+  const st = await getJSON('/code/status?id=' + curJob);
+  if (st && st.ok) {
+    renderLive(st);
+    if (st.state !== 'running') { clearInterval(pollTimer); pollTimer = null; return; }
+  }
+}
+$('#runBtn').onclick = async () => {
+  const topic = $('#topic').value.trim();
+  if (!topic) return;
+  const seats = picked.map((x, i) => {
+    const chip = document.querySelector('.chipseat[data-i="' + i + '"]');
+    const sel = chip && chip.querySelector('.pr');
+    return {provider: x.provider, role: (sel ? sel.value : x.role) || ''};
+  });
+  if (seats.length < 2) { $('#state').textContent = lang() === 'zh' ? '至少选两家' : 'pick two at least'; return; }
+  $('#out').innerHTML = '';
+  $('#runBtn').style.display = 'none';
+  $('#stopBtn').style.display = '';
+  $('#sayRow').style.display = 'flex';
+  $('#state').textContent = lang() === 'zh' ? '起跑…' : 'starting…';
+  const r = await postJSON('/code/start', {task: topic, seats, rounds: Number($('#rounds').value), budget: Number($('#budget').value || 0)});
+  if (!r || !r.ok) { $('#state').textContent = (r && r.error) || 'failed'; $('#runBtn').style.display = ''; return; }
+  curJob = r.id;
+  pollTimer = setInterval(poll, 1500);
+  poll();
+};
+$('#stopBtn').onclick = async () => {
+  if (curJob) await postJSON('/code/stop', {id: curJob});
+  $('#state').textContent = lang() === 'zh' ? '叫停了，这一轮写完就收' : 'stopping after this turn';
+};
+$('#sayBtn').onclick = async () => {
+  const t = $('#sayInput').value.trim();
+  if (!t || !curJob) return;
+  await postJSON('/code/say', {id: curJob, text: t});
+  $('#sayInput').value = '';
+  $('#state').textContent = lang() === 'zh' ? '已送到，下一轮他们会回应' : 'sent — next round must answer';
+};
+
+let mode = 'code';
+document.querySelectorAll('[data-mode]').forEach((t) => {
+  t.onclick = () => {
+    mode = t.dataset.mode;
+    document.querySelectorAll('[data-mode]').forEach((x) => x.classList.toggle('on', x === t));
+    picked = [];
+    paint();
+    $('#modeHint').textContent = mode === 'debate'
+      ? (lang() === 'zh' ? '两方对打，最后出共识/分歧/建议' : 'Two sides argue; ends with consensus, disagreement, recommendation')
+      : (lang() === 'zh' ? '第一个席位当作者，其余当评审；写完就评、评完就改，最后交终稿'
+        : 'First seat writes, the rest review; write, review, revise, then a final draft');
+  };
+});
+mountTools({lang: paint});
+load();
+</script></body></html>

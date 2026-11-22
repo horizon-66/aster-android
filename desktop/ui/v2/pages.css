@@ -1,0 +1,42 @@
+.page{max-width:900px;margin:0 auto;padding:34px 24px 70px}
+.page h1{font-size:20px;margin:0 0 4px}
+.page .lead{color:var(--dim);font-size:12.5px;margin:0 0 22px}
+.panel{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:18px 20px;margin-bottom:14px}
+.panel h2{font-size:13.5px;margin:0 0 12px}
+.list{display:flex;flex-direction:column;gap:2px}
+.it{display:flex;gap:12px;align-items:flex-start;padding:11px 4px;border-top:1px solid #f4f1ec}
+.it:first-child{border-top:0}
+.it .dot{width:6px;height:6px;border-radius:50%;background:#dcd8d0;margin-top:7px;flex:0 0 auto}
+.it.run .dot{background:var(--pink)}
+.it.blocked .dot{background:#d9a12b}
+.it.done .dot{background:#5aa87a}
+.it .body{flex:1;min-width:0}
+.it b{display:block;font-size:13px;font-weight:500;line-height:1.5}
+.it .meta{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:3px}
+.it .act{font-size:11.5px;color:var(--ink2);cursor:pointer}
+.it .act:hover{color:var(--ink)}
+.toolbar{display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+.search{flex:1;min-width:200px;background:#fff;border:1px solid var(--line2);border-radius:11px;
+  padding:9px 12px;font-size:13px;color:var(--ink);outline:none}
+.tab{padding:6px 12px;border-radius:99px;border:1px solid var(--line2);background:#fff;font-size:12px;
+  color:var(--ink2);cursor:pointer}
+.tab.on{background:#fdeef0;border-color:rgba(232,23,61,.3);color:var(--pink)}
+.empty{padding:26px 6px;text-align:center;color:var(--dim);font-size:12.5px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.skill{display:flex;gap:12px;align-items:flex-start;padding:12px 4px;border-top:1px solid #f4f1ec}
+.skill:first-child{border-top:0}
+.skill b{font-size:13px}
+.skill .d{font-size:11.5px;color:var(--dim);margin-top:3px;line-height:1.6}
+.skill .btn{margin-left:auto}
+/* 深色卡：每页一个，和对话页同一套 */
+.dark{background:linear-gradient(162deg,#2a2c31 0%,#1e2023 42%,#15161a 100%);color:var(--paper);
+  border-radius:var(--r);box-shadow:0 26px 64px rgba(24,24,28,.26), inset 0 1px 0 rgba(255,255,255,.06);
+  padding:18px 20px;margin-bottom:14px}
+.dark .h5{color:#8b8d94;margin:0 0 10px}
+.dark .row2{display:flex;gap:26px;flex-wrap:wrap}
+.dark .num{font-family:var(--mono);font-size:24px;letter-spacing:-.02em}
+.dark .cap{font-size:11px;color:#8b8d94;margin-top:2px}
+.dark .pink{color:#ef8b95}
+/* 页标题：粉点做记号，字仍是黑的 */
+.ptitle::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;
+  background:var(--pink);margin-right:10px;vertical-align:4px}
