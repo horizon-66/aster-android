@@ -35,7 +35,7 @@ button,a,input,textarea,select,.tbtn,.nav a,.chip{-webkit-app-region:no-drag;app
   background:var(--pink);margin-right:8px;vertical-align:2px}
 .fixedNav .foot{margin-top:auto;font-size:10.5px;color:var(--dim);line-height:1.9;padding:0 10px;white-space:nowrap}
 /* 内容在整窗居中，左栏浮在上层；窄窗口时再让位 */
-body.hasNav{padding-left:0}
+body.hasNav{padding-left:216px}   /* 左栏是固定定位的，正文始终给它让位 */
 .page{margin-left:auto;margin-right:auto}
 @media (max-width:1180px){ body.hasNav{padding-left:216px} }
 

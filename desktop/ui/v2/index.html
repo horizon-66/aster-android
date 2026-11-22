@@ -1,0 +1,168 @@
+<!doctype html><html lang="zh"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aster</title>
+<link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="shell.css">
+<link rel="stylesheet" href="chat.css"><link rel="stylesheet" href="rail.css">
+</head><body>
+<div class="dragbar"></div>
+<div class="app">
+  <nav class="nav">
+    <div class="mark">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#e8173d" stroke-width="1.5" stroke-linejoin="round">
+        <path d="M12 2.6 13.8 10 21 12l-7.2 2L12 21.4 10.2 14 3 12l7.2-2Z"/></svg>
+      <b>ASTER</b>
+    </div>
+    <a class="on" data-nav="chat" data-zh="对话" data-en="Chat">对话</a>
+    <a data-nav="work" data-zh="工作台" data-en="Work">工作台</a>
+    <a data-nav="mem" data-zh="记忆" data-en="Memory">记忆</a>
+    <a data-nav="trip" data-zh="日程" data-en="Schedule">日程</a>
+    <a data-nav="role" data-zh="角色" data-en="Character">角色</a>
+    <a data-nav="code" data-zh="编码" data-en="Coding">编码</a>
+    <a data-nav="debate" data-zh="议事" data-en="Debate">议事</a>
+    <a data-nav="skill" data-zh="技能" data-en="Skills">技能</a>
+    <a data-nav="set" data-zh="设置" data-en="Settings">设置</a>
+    <div class="foot" style="white-space:nowrap" data-zh="记忆与情绪存于本机<br>不上传 · 可导出迁移"
+         data-en="Memory and mood are stored on this device<br>never uploaded · exportable">记忆与情绪存于本机<br>不上传 · 可导出迁移</div>
+  </nav>
+
+  <main class="card chat">
+    <div class="head">
+      <span class="name" id="herName">Aster</span>
+      <span class="meta" id="modelLine">本地 · qwen2.5:7b</span>
+      <span class="sp"></span>
+      <div class="tools">
+        <button class="tbtn" id="permBtn" title="permission">
+          <span id="permText">工作区内可修改</span><span>▾</span></button>
+        <button class="tbtn" id="langBtn">中 / EN</button>
+        <button class="tbtn" id="musicBtn" title="music">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.7"
+               stroke-linecap="round"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg>
+        </button>
+        <button class="tbtn" id="previewBtn" data-zh="网页预览" data-en="Web preview">网页预览</button>
+        <button class="tbtn" id="newBtn" data-zh="新会话" data-en="New session">新会话</button>
+      </div>
+    </div>
+
+    <div class="log" id="log"><p class="day" id="dayLine"></p></div>
+
+    <div class="empty" id="emptyBlock">
+      <div class="et" data-zh="今日尚无进行中的事项" data-en="No tasks in progress today">今日尚无进行中的事项</div>
+      <div class="chips" id="emptyChips"></div>
+    </div>
+
+    <div class="compose">
+      <div class="file" id="fileRow" style="display:none">
+        <b id="fileName"></b><span id="fileMeta"></span><span class="x" id="fileX" data-zh="撤下" data-en="Remove">撤下</span>
+      </div>
+      <div class="in">
+        <button class="ib" id="micBtn" title="voice">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+            <rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"/></svg></button>
+        <button class="ib" id="picBtn" title="image">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+            <rect x="3" y="4.5" width="18" height="15" rx="3"/><circle cx="8.5" cy="10" r="1.6"/><path d="M4 17l5-4.5 4 3.5 3-2.5 4 3.5"/></svg></button>
+        <button class="ib" id="fileBtn" title="file">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+            <path d="M20 11.5 12.6 19a4.4 4.4 0 0 1-6.2-6.2l7.6-7.6a3 3 0 0 1 4.2 4.2l-7.5 7.6a1.6 1.6 0 0 1-2.3-2.3l6.9-6.9"/></svg></button>
+        <textarea id="text" data-zh-ph="请输入内容" data-en-ph="Type a message…" placeholder="请输入内容"></textarea>
+        <button class="ib" id="modeChip" title="切换：聊天 / 让它动手"
+          style="width:auto;padding:0 10px;font-size:11.5px;color:var(--ink2)">聊天</button>
+        <button class="send" id="sendBtn" data-zh="发送" data-en="Send">发送</button>
+      </div>
+      <div class="hint">
+        <span data-zh="按回车键发送" data-en="Press Enter to send">按回车键发送</span>
+        <span data-zh="Shift 加回车换行" data-en="Shift+Enter to insert a line break">Shift 加回车换行</span>
+        <span class="sp"></span>
+        <span id="modeLine">本地处理 · —</span>
+        <a id="wrongBtn" data-zh="记录有误" data-en="Report an error">记录有误</a>
+      </div>
+    </div>
+  </main>
+
+  <aside class="rail">
+    <div class="card">
+      <div class="who">
+        <div class="face"><input type="file" id="facePick" accept="image/*" style="display:none">
+        <img id="faceImg" style="cursor:pointer" title="点头像换照片" alt=""></div>
+        <div><b id="railName">Aster</b><span id="faceCap">表情 · 平静</span></div>
+      </div>
+      <p class="now" id="nowLine">安静地看着你</p>
+      <p class="sub" id="nowSub"></p>
+      <div class="rel" id="relRow" title="">
+        <span data-zh="关系" data-en="Bond">关系</span>
+        <i><b id="relBar" style="width:0%"></b></i>
+        <em id="relNum">—</em>
+      </div>
+      <h5 class="h5" data-zh="情绪" data-en="Mood">情绪</h5>
+      <div id="gauges"></div>
+      <div class="more" id="moreBtn" data-zh="展开全部八项 ▾" data-en="Show all eight ▾">展开全部八项 ▾</div>
+    </div>
+
+    <div class="card dark">
+      <h5 class="h5" data-zh="进行中的事项" data-en="In progress">进行中的事项</h5>
+      <div id="tasks"></div>
+      <div class="link" data-zh="前往工作台 →" data-en="Open workbench →">前往工作台 →</div>
+    </div>
+
+    <div class="card">
+      <h5 class="h5" data-zh="今日" data-en="Today">今日</h5>
+      <div class="led"><span data-zh="记录" data-en="Recorded">记录</span><b id="statRecorded">0 条</b></div>
+      <div class="led"><span data-zh="完成" data-en="Completed">完成</span><b id="statCompleted">0 件</b></div>
+      <div class="led"><span data-zh="受阻" data-en="Blocked">受阻</span><b id="statBlocked">0 件</b></div>
+      <div class="led"><span data-zh="费用" data-en="Cost">费用</span><b id="statCost">¥0.00</b></div>
+      <div class="led"><span data-zh="平均响应" data-en="Avg">平均响应</span><b id="statLatency">—</b></div>
+    </div>
+
+    <div class="card">
+      <h5 class="h5" data-zh="最近记录" data-en="Recently recorded">最近记录</h5>
+      <div id="memos"></div>
+    </div>
+  </aside>
+  <div id="pvTab" style="position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:69;
+    writing-mode:vertical-rl;background:#fff;border:1px solid var(--line2);border-right:0;border-radius:10px 0 0 10px;
+    padding:10px 5px;font-size:11.5px;color:var(--ink2);cursor:pointer">网页预览</div>
+  <div id="previewPane" style="display:none;position:fixed;right:0;top:34px;bottom:0;width:44%;min-width:420px;
+    background:var(--bg);border-left:1px solid var(--line2);z-index:70;padding:10px;flex-direction:column;gap:8px">
+    <div style="display:flex;gap:8px">
+      <input id="pvAddr" placeholder="链接或搜索词" style="flex:1;background:#fff;border:1px solid var(--line2);
+        border-radius:9px;padding:7px 10px;font-size:12px;outline:none">
+      <button id="pvGo" style="height:30px;padding:0 12px;border:0;border-radius:9px;background:var(--ink);
+        color:var(--paper);font-size:12px;cursor:pointer">打开</button>
+      <button id="pvClose" style="height:30px;padding:0 10px;border:1px solid var(--line2);border-radius:9px;
+        background:#fff;font-size:12px;cursor:pointer">×</button>
+    </div>
+    <webview id="pvView" src="about:blank" style="flex:1;border:1px solid var(--line2);border-radius:12px;background:#fff"></webview>
+    <div id="pvOut" style="font-size:11.5px;color:var(--ink2);min-height:16px"></div>
+  </div>
+</div>
+
+<script src="i18n.js"></script>
+<script src="api.js"></script>
+<script src="app.js"></script>
+<div id="hello" style="position:fixed;inset:0;z-index:900;background:#0b0b0e;display:flex;
+  align-items:center;justify-content:center;flex-direction:column;gap:16px;transition:opacity .5s">
+  <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#e8173d" stroke-width="1.6" stroke-linejoin="round"><path d="M12 2.6 13.8 10 21 12l-7.2 2L12 21.4 10.2 14 3 12l7.2-2Z"/></svg>
+  <div id="helloLine" style="color:#e8e6e0;font-size:13px;letter-spacing:.1em">今天想说什么</div>
+</div>
+<script>
+(function () {
+  const box = document.getElementById('hello');
+  if (!box) return;
+  const line = document.getElementById('helloLine');
+  const zh = ['今天想说什么', '我在这儿', '今天过得怎么样'];
+  const en = ['What is it today', 'I am here', 'How was your day'];
+  const i = Math.floor(Math.random() * zh.length);
+  if (window.lang && lang() === 'en') line.textContent = en[i];
+  let done = false;
+  const go = () => {
+    if (done) return; done = true;
+    box.style.opacity = '0';
+    setTimeout(() => box.remove(), 520);
+    try { const inp = document.getElementById('input'); if (inp) inp.focus(); } catch (e) {}
+  };
+  setTimeout(go, 2200);
+  box.addEventListener('click', go);
+  document.addEventListener('keydown', go, { once: true });
+})();
+</script>
+</body></html>

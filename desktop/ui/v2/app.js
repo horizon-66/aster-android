@@ -122,8 +122,19 @@ function paintLang() {
 }
 $('#langBtn').onclick = () => {
   setLang(lang() === 'zh' ? 'en' : 'zh');
-  paintLang(); paintIdeas(); paintDate(); paintPerm(); loadRail();
+  paintLang(); paintIdeas(); paintDate(); paintPerm();
+  loadRail();
 };
+
+// 今日花费：拿 /usage 的估算价，别让「费用」一直挂 0.00
+async function paintCost() {
+  try {
+    const u = await getJSON('/usage');
+    const el = document.getElementById('statCost');
+    if (el && u && u.ok) el.textContent = '¥' + Number(u.cost || 0).toFixed(2);
+  } catch (e) {}
+}
+
 const PERM_LABEL = {
   1: ['只读', 'Read only'],
   2: ['工作区内可修改', 'Edit in workspace'],
@@ -978,7 +989,7 @@ function paintIdeas() {
   
   applyNames(); wireFacePick();
   setInterval(pollProactive, 120000); setTimeout(pollProactive, 20000);
-  paintLang(); paintMusic(); paintIdeas(); paintDate(); paintPerm(); paintMode(); loadRail();
+  paintLang(); paintMusic(); paintIdeas(); paintDate(); paintPerm(); paintMode(); loadRail(); paintCost();
   // 2026-11-22：右栏以前只在开机和发完消息时刷一次，激素自己在变也看不见。
   // 现在每 25 秒拉一次 /state，窗口重新拿到焦点也立刻刷。
   setInterval(loadRail, 25000);

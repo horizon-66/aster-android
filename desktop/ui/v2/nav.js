@@ -5,7 +5,7 @@
     ['work', 'work.html', '工作台', 'Work'],
     ['mem', 'memory.html', '记忆', 'Memory'],
     ['role', 'role.html', '角色', 'Character'],
-    ['trip', 'trips.html', '日程', 'Schedule'],,
+    ['trip', 'trips.html', '日程', 'Schedule'],
     ['code', 'code.html', '编码', 'Coding'],
     ['debate', 'debate.html', '议事', 'Debate'],
     ['skill', 'skills.html', '技能', 'Skills'],
@@ -25,6 +25,7 @@
     'data-en="Memory and mood are stored on this device<br>never uploaded · exportable">' +
     '记忆与情绪存于本机<br>不上传 · 可导出迁移</div>';
   document.body.appendChild(nav);
+  document.body.classList.add('hasNav');   // 让正文给左栏让位
   nav.querySelectorAll('a').forEach((a) => {
     a.addEventListener('click', (e) => {
       const href = a.getAttribute('href') || '';
