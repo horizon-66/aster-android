@@ -634,6 +634,140 @@ def facts_all(limit: int = 100) -> list:
         return []
 
 
+_LESSON_MARK = r"(别再|不要|注意|教训|坑|必检|之前.{0,6}错|上次.{0,6}坏|踩过)"
+
+
+def lessons_line(text: str, limit: int = 3) -> str:
+    """他踩过的坑：只在话题真的沾边时才亮出来，别每句话都端出来。"""
+    kws = [k for k in retrieval_keywords(text, []) if len(k) >= 2][:6]
+    if not kws:
+        return ""
+    try:
+        import sqlite3
+        c = sqlite3.connect(DB_FILE, timeout=5)
+        _cond = " or ".join(["text like ?"] * len(kws))
+        rows = c.execute(
+            "select text from items where tag in ('项目','技能') "
+            "and coalesce(fragment,0) < 2 and (" + _cond + ") limit 200",
+            tuple("%" + k + "%" for k in kws)).fetchall()
+        c.close()
+    except Exception:
+        return ""
+    out = []
+    for (t,) in rows:
+        t = re.sub(r"^(他说的：|我说：)", "", str(t or "")).strip()
+        if not t or not re.search(_LESSON_MARK, t):
+            continue
+        if len(t) > 46:
+            t = t[:46] + "…"
+        if t not in out:
+            out.append(t)
+        if len(out) >= limit:
+            break
+    return ("他踩过的坑（做同类事之前先避开）：\n" + "\n".join("· " + x for x in out) + "\n") if out else ""
+
+
+_TAG_RULES = [
+    ("忌讳", r"(我讨厌|我不喜欢|我受不了|我反感|别总|别老是|别安排|不要安排)"),
+    ("偏好", r"(我喜欢|我最爱|我爱吃|我爱喝|我习惯|就好这一口|偏好|每次都要)"),
+    ("身份", r"(我叫|我的名字|我是做|我住|我在.{1,8}上班)"),
+    ("关系", r"(我妈|我爸|我弟|我妹|我哥|我姐|我老婆|我老公|我对象|我朋友)"),
+]
+
+
+def classify_tag(text: str, default: str = "对话") -> str:
+    """按内容给记忆归一次类。
+
+    只认「他自己说的、明确的第一人称」。她的回声（我说：…）不参与归类，
+    否则「要不要聊聊别的」会被当成他的忌讳。
+    """
+    t = str(text or "").strip()
+    if t.startswith("我说：") or t.startswith("（本地）我说："):
+        return default
+    if t.startswith("他说的："):
+        t = t[4:]
+    if "？" in t or "?" in t:
+        return default
+    for tag, pat in _TAG_RULES:
+        if re.search(pat, t):
+            return tag
+    return default
+
+
+def retag(dry: bool = True) -> dict:
+    """把已有记忆按内容重分一次类；只动「对话」与「偏好」两类，别的保持原样。"""
+    try:
+        import sqlite3
+        c = sqlite3.connect(DB_FILE, timeout=10)
+        # 老行的 id 可能是空的，只能按 rowid 改
+        rows = c.execute("select rowid, text, tag from items where tag in ('对话','偏好')").fetchall()
+        moves = {}
+        for rid, t, tag in rows:
+            new = classify_tag(t, default=tag)
+            if new != tag:
+                moves.setdefault((tag, new), []).append(rid)
+        if not dry:
+            for (_old, new), ids in moves.items():
+                for k in range(0, len(ids), 500):
+                    c.executemany("update items set tag=? where rowid=?", [(new, x) for x in ids[k:k + 500]])
+            c.commit()
+        c.close()
+        return {"ok": True, "dry": dry, "scanned": len(rows),
+                "moves": {"%s→%s" % k: len(v) for k, v in moves.items()}}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:80]}
+
+
+def prefs_line(limit: int = 6) -> str:
+    """他明确说过的偏好与忌讳，压成一行常驻提示词。
+    以前只靠关键词检索，不提「安排」就带不出「讨厌被安排」，等于没用。"""
+    try:
+        import sqlite3
+        c = sqlite3.connect(DB_FILE, timeout=5)
+        rows = c.execute(
+            "select text from items where tag = '偏好' "
+            "and coalesce(fragment,0) < 2 "
+            "order by coalesce(hits,0) desc, coalesce(created,0) desc limit ?",
+            (limit,)).fetchall()
+        c.close()
+    except Exception:
+        return ""
+    if not rows:
+        return ""
+    parts = []
+    for (t,) in rows:
+        t = re.sub(r"^(他说的：|我说：)", "", str(t or "")).strip()
+        if len(t) > 28:
+            t = t[:28] + "…"
+        if t and t not in parts:
+            parts.append(t)
+    return ("他的偏好——" + "；".join(parts[:5]) + "\n") if parts else ""
+
+
+def taboos_line(limit: int = 3) -> str:
+    """忌讳单独成一条「不要做」清单：偏好是加分项，忌讳是红线，两者不能混在一句里。"""
+    try:
+        import sqlite3
+        c = sqlite3.connect(DB_FILE, timeout=5)
+        rows = c.execute(
+            "select text from items where tag = '忌讳' and coalesce(fragment,0) < 2 "
+            "order by coalesce(hits,0) desc, coalesce(created,0) desc limit ?",
+            (limit,)).fetchall()
+        c.close()
+    except Exception:
+        return ""
+    out = []
+    for (t,) in rows:
+        t = re.sub(r"^(他说的：|我说：)", "", str(t or "")).strip()
+        if len(t) > 26:
+            t = t[:26] + "…"
+        if t and t not in out:
+            out.append(t)
+    if not out:
+        return ""
+    return ("他不接受的（别做，也别劝）——" + "；".join(out) + "\n")
+
+
 def facts_line(limit: int = 8) -> str:
     """塞进提示词的一行硬事实。"""
     try:
@@ -1944,6 +2078,13 @@ def run_task(tid: int) -> None:
         if str(_r["result"]).startswith(("写坏了", "改坏了", "这条命令不允许", "找不到", "读不到")):
             update_task(tid, status="blocked", error=str(_r["result"])[:200])
             notify(tid, "blocked", {"goal": t.get("goal"), "reason": str(_r["result"])[:80]})
+            # 卡住的地方要变成「教训」留下来，下次做同类活之前先亮出来（新个体也一样积累）
+            try:
+                db_remember("教训｜" + str(t.get("goal") or "")[:40] + "：" +
+                            str(_r["result"])[:80] + "（下次先检查这一步）",
+                            tag="项目", src="task")
+            except Exception:
+                pass
             return
 
     # 验收
@@ -2320,12 +2461,12 @@ def _derive_emotions(st: dict, horm: dict) -> dict:
             return d
     c = float(horm.get("cortisol", 0) or 0)
     out = {
-        "亲近": g("黏"), "好奇": g("好奇"), "柔软": g("软"),
-        "想念": round(g("黏") * 0.5 + g("欲") * 0.5, 2),
-        "烦": round(max(c, g("醋") * 0.6), 2),
+        "亲近": g("依恋"), "好奇": g("好奇"), "柔和": g("柔和"),
+        "想念": round(g("依恋") * 0.5 + g("渴望") * 0.5, 2),
+        "烦": round(max(c, g("妒意") * 0.6), 2),
         "孤独": g("孤独"),
         "疲惫": round(1 - g("能量"), 2),
-        "踏实": round(g("软") * 0.6 + g("能量") * 0.4, 2),
+        "踏实": round(g("柔和") * 0.6 + g("精力") * 0.4, 2),
     }
     return {k: round(v, 2) for k, v in out.items() if v >= 0.15}
 
@@ -2927,6 +3068,22 @@ def _tts_index(text: str, out: str) -> bool:
         except Exception:
             continue
     return False
+
+
+SKILL_USE = os.path.join(HOME, "skill_usage.json")
+
+
+def _bump_skill(name: str) -> None:
+    try:
+        import datetime as _dt3
+        d = _load(SKILL_USE, {})
+        rec = d.get(name) or {"n": 0, "last": 0}
+        rec["n"] = int(rec.get("n") or 0) + 1
+        rec["last"] = int(time.time())
+        d[name] = rec
+        _save(SKILL_USE, d)
+    except Exception:
+        pass
 
 
 def _tts_probe() -> bool:
@@ -4853,6 +5010,7 @@ def chat(text: str) -> dict:
                 _cands = [str(_sk.get("name") or "")] + [str(x) for x in (_sk.get("triggers") or [])]
                 if any(c and len(c) >= 2 and c in (text or "") for c in _cands):
                     _hit2 = _sk.get("name")
+                    _bump_skill(_hit2)
                     break
         except Exception:
             _hit2 = None
@@ -5041,6 +5199,7 @@ def chat(text: str) -> dict:
                 + (("他现在的情绪：" + _emo + "；你该用的语气：" + _tone + "\n") if (_emo or _tone) else "")
                 + (("他说过这些（第三人称「他」都是他本人，别当成你自己；你确实记得）：\n"
                     + "\n".join("· " + to_third(m, _owner_line(m)) for m in mem) + "\n") if mem else "")
+                + lessons_line(text)
                 + (("刚才：\n" + hist_txt + "\n") if hist_txt else "")
                 + "他现在说：" + text_for_cloud[:200] + "\n")
         _mt = 400
@@ -5053,6 +5212,8 @@ def chat(text: str) -> dict:
                 + (("你该用的语气：" + _tone + "\n") if _tone else "")
                 + (("你对他的了解：\n" + prof.get("text", "")[:600] + "\n") if prof.get("text") else "")
                 + ((facts_line() + "\n") if facts_line() else "")
+                + prefs_line()
+                + taboos_line()
                 + (("他说过这些（第三人称「他」都是他本人，别当成你自己；这些你确实记得，别说不记得）：\n"
                     + "\n".join("· " + to_third(m, _owner_line(m)) for m in mem) + "\n") if mem else "")
                 + (("更早聊过的（摘要）：\n" + summary_text() + "\n") if summary_text() else "")
@@ -5162,6 +5323,17 @@ def chat(text: str) -> dict:
         out = "这一步我没做完（做了：" + did + "），卡在中间了——你再说细一点，或者我换个做法。"
     if not out:
         out = "这会儿脑子不转，等会儿再说"
+
+    # 同一句话回来一模一样，说明她被上一轮的自己带住了：给一次机会换个说法。
+    try:
+        _recent = [h.get("content") or "" for h in HISTORY[-8:] if h.get("role") == "assistant"]
+        if out and len(out) <= 24 and out in _recent:
+            _out2 = cloud(base + "（刚才你自己已经说过「" + out + "」了，别再重复这句，换个说法。）\n",
+                          max_tokens=_mt) or ""
+            if _out2 and _out2.strip() != out:
+                out = _out2.strip()
+    except Exception:
+        pass
 
     feel(text)
     try:
@@ -5806,6 +5978,8 @@ class H(BaseHTTPRequestHandler):
             return self._json({"ok": True, "items": []})
         if self.path.startswith("/agent/approve") or self.path.startswith("/agent/request"):
             return self._json({"ok": True, "note": "没有待批的事"})
+        if self.path.startswith("/memory/retag"):
+            return self._json(retag(dry=True))
         if self.path.startswith("/memory/decay"):
             return self._json(decay(dry=True))
         if self.path.startswith("/habit"):
@@ -5887,6 +6061,17 @@ class H(BaseHTTPRequestHandler):
             return self._json(face_now())
         if self.path.startswith("/album"):
             return self._json({"ok": True, "items": album()})
+        if self.path.startswith("/code/list"):
+            import codework as _cw2
+            return self._json({"ok": True, "items": _cw2.list_jobs(30)})
+        if self.path.startswith("/debate/list"):
+            import debate as _db2
+            return self._json({"ok": True, "items": _db2.list_saved(30)})
+        if self.path.startswith("/debate/load"):
+            import debate as _db3
+            import urllib.parse as _up3
+            _q3 = _up3.parse_qs(_up3.urlparse(self.path).query)
+            return self._json(_db3.load_saved((_q3.get("f") or [""])[0]))
         if self.path.startswith("/code/status"):
             import codework as _cw
             import urllib.parse as _up2
@@ -6020,6 +6205,11 @@ class H(BaseHTTPRequestHandler):
         if self.path.startswith("/ext/catalog_url"):
             cur = os.environ.get("ASTER_CATALOG_URL") or (_load(os.path.join(HOME, "catalog.json"), {}) or {}).get("url") or ""
             return self._json({"ok": True, "url": cur})
+        if self.path.startswith("/ext/usage"):
+            d = _load(SKILL_USE, {})
+            return self._json({"ok": True, "items": [{"name": k, "n": int(v.get("n") or 0),
+                                                      "last": int(v.get("last") or 0)}
+                                                     for k, v in d.items()]})
         if self.path.startswith("/ext/list"):
             try:
                 _pk = _ext.scan() if _ext else []
@@ -6041,10 +6231,25 @@ class H(BaseHTTPRequestHandler):
             return self._json({"ok": True, "items": _load(INBOX, {"items": []}).get("items", [])})
         if self.path.startswith("/memory"):
             # 2026-11-22：记忆页改看主库 mem.db，带主体与来源，能看见也能删
+            import urllib.parse as _up2
+            _q = _up2.parse_qs(_up2.urlparse(self.path).query)
+            _tags = [t for t in (_q.get("tag") or [""])[0].split(",") if t.strip()]
+            _lim = max(1, min(500, int((_q.get("limit") or ["60"])[0])))
+            _kw = (_q.get("q") or [""])[0].strip()
             try:
                 c = _memdb()
-                rows = c.execute("select id, text, tag, created, src, subject from items "
-                                 "order by created desc limit 60").fetchall()
+                if _tags:
+                    _ph = ",".join("?" * len(_tags))
+                    rows = c.execute("select id, text, tag, created, src, subject from items "
+                                     "where tag in (%s) order by created desc limit ?" % _ph,
+                                     tuple(_tags) + (_lim,)).fetchall()
+                elif _kw:
+                    rows = c.execute("select id, text, tag, created, src, subject from items "
+                                     "where text like ? order by created desc limit ?",
+                                     ("%" + _kw + "%", _lim)).fetchall()
+                else:
+                    rows = c.execute("select id, text, tag, created, src, subject from items "
+                                     "order by created desc limit ?", (_lim,)).fetchall()
                 total = c.execute("select count(*) from items").fetchone()[0]
                 c.close()
             except Exception as e:
@@ -6113,9 +6318,40 @@ class H(BaseHTTPRequestHandler):
                                 "rel": _wd, "workdir": _wd})
                 except Exception:
                     pass
+            try:
+                import glob as _g4
+                for _df in _g4.glob(os.path.join(HOME, "debates", "debate-*.json")):
+                    try:
+                        _dd = json.load(open(_df, encoding="utf-8"))
+                    except Exception:
+                        continue
+                    out.append({"id": _dd.get("saved") or _df, "kind": "debate",
+                                "title": str(_dd.get("topic") or "")[:60],
+                                "task": str(_dd.get("topic") or "")[:60],
+                                "path": _df, "rel": _df, "files": [],
+                                "t": int(os.path.getmtime(_df)), "rerun": False,
+                                "state": "done"})
+            except Exception:
+                pass
             out.sort(key=lambda x: -x["t"])
             return self._json({"ok": True, "items": out[:50]})
+        if self.path.startswith("/history/export"):
+            import datetime as _dt2
+            _rows = chat_log()
+            _txt = "\n".join(("我：" if x.get("who") == "me" else "她：") + str(x.get("text") or "")
+                             for x in _rows)
+            _dir = os.path.join(HOME, "exports")
+            os.makedirs(_dir, exist_ok=True)
+            _f = os.path.join(_dir, "chat-" + _dt2.datetime.now().strftime("%Y%m%d-%H%M%S") + ".txt")
+            open(_f, "w", encoding="utf-8").write(_txt)
+            return self._json({"ok": True, "path": _f, "lines": len(_rows)})
         if self.path.startswith("/history"):
+            import urllib.parse as _up5
+            _q5 = _up5.parse_qs(_up5.urlparse(self.path).query)
+            _k5 = (_q5.get("q") or [""])[0].strip()
+            if _k5:
+                _hit5 = [x for x in chat_log() if _k5 in str(x.get("text") or "")]
+                return self._json({"ok": True, "items": _hit5[-80:], "q": _k5, "n": len(_hit5)})
             disk = chat_log()
             if disk:
                 return self._json({"ok": True, "items": disk})
@@ -6476,6 +6712,21 @@ class H(BaseHTTPRequestHandler):
             items.append(it)
             _save(os.path.join(HOME, "trips.json"), items[-200:])
             return self._json({"ok": True, "item": it})
+        if self.path.startswith("/trip/update"):
+            _id = body.get("id")
+            try:
+                _ts = _load(os.path.join(HOME, "trips.json"), [])
+                for _x in _ts:
+                    if str(_x.get("id")) == str(_id):
+                        if body.get("what"):
+                            _x["what"] = str(body["what"])[:80]
+                        if body.get("when"):
+                            _x["when"] = str(body["when"])[:40]
+                        break
+                _save(os.path.join(HOME, "trips.json"), _ts)
+                return self._json({"ok": True, "items": _ts})
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)[:80]}, 500)
         if self.path.startswith("/trip/travel"):
             _m9 = int(body.get("minutes") or 0)
             _save(os.path.join(HOME, "travel.json"), {"minutes": _m9})
@@ -6485,6 +6736,8 @@ class H(BaseHTTPRequestHandler):
             items = [x for x in _load(os.path.join(HOME, "trips.json"), []) if str(x.get("id")) != str(tid)]
             _save(os.path.join(HOME, "trips.json"), items)
             return self._json({"ok": True})
+        if self.path.startswith("/memory/retag"):
+            return self._json(retag(dry=False))
         if self.path.startswith("/facts/backfill"):
             # 从既有记忆里补捡事实：只读文本、写 facts 表
             try:
@@ -6723,13 +6976,32 @@ class H(BaseHTTPRequestHandler):
                                                  "intimacy": _d["intimacy"]})
             _relation.save(_d)
             return self._json(_relation.state())
+        if self.path.startswith("/memory/mark"):
+            # 标成「重要」：衰减算力气时权重翻倍，图上也不会先淡下去
+            _rid = body.get("rid")
+            _on = bool(body.get("on", True))
+            if _rid is None:
+                return self._json({"ok": False, "error": "没给 rid"})
+            try:
+                c = _memdb()
+                c.execute("update items set boost=? where rowid=?",
+                          (2.5 if _on else 1.0, int(_rid)))
+                c.commit()
+                c.close()
+                return self._json({"ok": True, "on": _on})
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)[:80]}, 500)
         if self.path.startswith("/memory/del"):
             _id = str(body.get("id") or "").strip()
-            if not _id:
+            _rid = body.get("rid")
+            if not _id and _rid is None:
                 return self._json({"ok": False, "error": "没给 id"})
             try:
                 c = _memdb()
-                n = c.execute("delete from items where id = ?", (_id,)).rowcount
+                if _rid is not None:
+                    n = c.execute("delete from items where rowid = ?", (int(_rid),)).rowcount
+                else:
+                    n = c.execute("delete from items where id = ?", (_id,)).rowcount
                 c.commit()
                 c.close()
             except Exception as e:

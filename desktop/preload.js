@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld('xingzi', {
   previewClose: (id) => ipcRenderer.invoke('preview:close', id),
   previewAct: (a) => ipcRenderer.invoke('preview:act', a),
   previewRead: () => ipcRenderer.invoke('preview:read'),
+  bmOpen: (items, rect) => ipcRenderer.invoke('bm:open', items, rect),
+  onBmPick: (cb) => ipcRenderer.on('bm:pick', (_e, url) => cb(url)),
+  onBmDel: (cb) => ipcRenderer.on('bm:del', (_e, url) => cb(url)),
   previewLinks: () => ipcRenderer.invoke('preview:links'),
   onPreviewTabs: (cb) => ipcRenderer.on('preview:tabs', (_e, tabs) => cb(tabs)),
   // 2026-11-12 夜：把拖进来的文件换成真实路径，交给引擎读

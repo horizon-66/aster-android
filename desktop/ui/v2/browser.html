@@ -70,6 +70,10 @@ if (_bmBtn) _bmBtn.onclick = () => {
   $('#bmBtn').textContent = '★'; $('#bmBtn').style.color = 'var(--pink)';
 };
 if (_bmList) _bmList.onclick = () => {
+  // 预览是原生视图，网页里的浮层会被它盖住 —— 交给主进程开个小窗口来列收藏
+  const b = _bmList.getBoundingClientRect();
+  if (api.bmOpen) { api.bmOpen(BMK(), { x: Math.round(b.right - 340), y: Math.round(b.bottom + 6) }); return; }
+  // 没桥接时（浏览器里直接打开）退回旧的浮层
   let box = document.getElementById('bmBox');
   if (box) { box.remove(); return; }
   const l = BMK();
@@ -84,13 +88,9 @@ if (_bmList) _bmList.onclick = () => {
     '<span data-del="' + x.url + '" style="color:#9a9aa1;cursor:pointer">×</span></div>').join('')
     : '<div style="padding:10px;color:#9a9aa1">还没有收藏</div>';
   document.body.appendChild(box);
-  box.querySelectorAll('[data-go]').forEach((a) => a.onclick = (e) => {
-    e.preventDefault(); api.previewNav && api.previewNav(a.dataset.go); curUrl = a.dataset.go; $('#addr').value = a.dataset.go; box.remove();
-  });
-  box.querySelectorAll('[data-del]').forEach((x) => x.onclick = () => {
-    saveBMK(BMK().filter((y) => y.url !== x.dataset.del)); box.remove();
-  });
 };
+if (api.onBmPick) api.onBmPick((url) => { curUrl = url; $('#addr').value = url; api.previewNav && api.previewNav(url); });
+if (api.onBmDel) api.onBmDel((url) => { saveBMK(BMK().filter((y) => y.url !== url)); });
 $('#newtab').onclick = () => { api.previewNewTab && api.previewNewTab('https://www.baidu.com/'); };
 $('#back').onclick = () => api.previewAct && api.previewAct('back');
 $('#fwd').onclick = () => api.previewAct && api.previewAct('fwd');

@@ -40,6 +40,14 @@
     </div>
   </div>
 
+  <div class="panel" style="padding:14px 16px;background:#1b1c1f;color:#f4f2ee">
+    <div style="display:flex;align-items:center;gap:10px">
+      <h2 style="font-size:13px;margin:0;color:#f4f2ee" data-zh="历史" data-en="History">历史</h2>
+      <span style="font-size:11.5px;color:#9a9aa1" id="histCount"></span>
+      <button id="histBtn" class="tbtn" style="margin-left:auto;background:transparent;border:1px solid rgba(255,255,255,.18);color:#d8d8e0" data-zh="展开" data-en="Show">展开</button>
+    </div>
+    <div id="hist" style="display:none;margin-top:10px;max-height:240px;overflow:auto;background:#1b1c1f;color:#f4f2ee;border-radius:12px;padding:8px 12px"></div>
+  </div>
   <div id="out"></div>
 </div>
 <script src="i18n.js"></script><script src="api.js"></script><script src="nav.js"></script>
@@ -294,4 +302,43 @@ document.querySelectorAll('[data-mode]').forEach((t) => {
 });
 mountTools({lang: paint});
 load();
-</script></body></html>
+</script><script>
+/* 历史：以前开过的单子，点一条就把那次的完整过程调出来 */
+window.addEventListener('DOMContentLoaded', function(){
+  const box = document.getElementById('hist');
+  const btn = document.getElementById('histBtn');
+  if (!box || !btn) return;
+  let loaded = false;
+  async function fill(){
+    const d = await getJSON('/code/list').catch(() => null);
+    const items = (d && d.items) || [];
+    document.getElementById('histCount').textContent = items.length ? (items.length + ' 条') : '还没有';
+    box.innerHTML = items.map(function(x, i){
+      const when = new Date((x.t || 0) * 1000).toLocaleString();
+      const title = x.task || x.topic || '';
+      return '<div class="hrow" data-i="' + i + '" style="padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.09);cursor:pointer">' +
+        '<div style="font-size:13px;color:#f4f2ee">' + title + '</div>' +
+        '<div style="font-size:11.5px;color:#9a9aa1;margin-top:2px">' + when +
+        (x.state ? (' · ' + x.state) : '') + '</div></div>';
+    }).join('') || '<div style="font-size:12.5px;color:#9a9aa1;padding:8px 2px">还没有</div>';
+    box.querySelectorAll('.hrow').forEach(function(row){
+      row.onclick = async function(){
+        const x = items[Number(row.dataset.i)];
+        if (!x) return;
+        curJob = x.id; document.getElementById('out').innerHTML = '';
+        const st = await getJSON('/code/status?id=' + x.id);
+        if (st && st.ok) renderLive(st);
+        if (st && st.state === 'running') { clearInterval(pollTimer); pollTimer = setInterval(poll, 4000); }
+      };
+    });
+  }
+  btn.onclick = function(){
+    const open = box.style.display === 'none';
+    box.style.display = open ? 'block' : 'none';
+    btn.textContent = open ? (lang() === 'zh' ? '收起' : 'Hide') : (lang() === 'zh' ? '展开' : 'Show');
+    if (open && !loaded) { loaded = true; fill(); }
+    else if (open) { fill(); }
+  };
+});
+</script>
+</body></html>

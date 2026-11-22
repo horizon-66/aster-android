@@ -27,7 +27,8 @@
   padding:18px 20px;margin-bottom:14px}
 .dark .h5{color:#8b8d94;margin:0 0 10px}
 .dark .row2{display:flex;gap:26px;flex-wrap:wrap}
-.dark .num{font-family:var(--mono);font-size:24px;letter-spacing:-.02em}
+.dark .num{font-family:var(--mono);font-size:24px;letter-spacing:-.02em;
+  line-height:1.15;height:28px;display:flex;align-items:flex-end}
 .dark .cap{font-size:11px;color:#8b8d94;margin-top:2px}
 .dark .pink{color:#ef8b95}
 

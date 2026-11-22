@@ -554,9 +554,13 @@ function thinkLine(t) {
   return '先当聊天接，别急着动工具。';
 }
 
+let _lastSent = '', _lastSentAt = 0;
 async function send() {
   const t = $('#text').value.trim();
   if (!t && !pending) return;
+  // 手抖连点、回车按两次：同一句四秒内只发一次，别让她对着同一句再答一遍
+  if (t && t === _lastSent && Date.now() - _lastSentAt < 4000) return;
+  if (t) { _lastSent = t; _lastSentAt = Date.now(); }
   let ask = t;
   if (pending) {
     ask = (t ? t + '\n\n' : '') + '【' + (lang() === 'zh' ? '我发来的文件' : 'file') + '：' + pending.name + '】\n' + (pending.text || '');
@@ -904,9 +908,9 @@ $('#micBtn').onclick = () => {
 };
 /* ---- 右栏 ---- */
 const GAUGES = [
-  ['energy', '活力', 'Energy'], ['attachment', '接近', 'Closeness'], ['softness', '柔软', 'Softness'],
-  ['desire', '想念', 'Longing'], ['tension', '张力', 'Tension'], ['loneliness', '孤独', 'Lonely'],
-  ['curiosity', '好奇', 'Curious'], ['grievance', '委屈', 'Hurt']
+  ['energy', '精力', 'Energy'], ['attachment', '依恋', 'Closeness'], ['softness', '柔和', 'Gentleness'],
+  ['desire', '想念', 'Longing'], ['tension', '妒意', 'Jealousy'], ['loneliness', '孤独感', 'Loneliness'],
+  ['curiosity', '好奇', 'Curiosity'], ['grievance', '委屈', 'Hurt']
 ];
 function paintGauges(st) {
   const list = expanded ? GAUGES : GAUGES.slice(0, 4);
@@ -925,8 +929,8 @@ async function loadRail() {
   const st = await getJSON('/state');
   if (st && st.states) {
     const s = st.states;
-    paintGauges({energy: s['能量'], attachment: s['黏'], softness: s['软'], desire: s['欲'],
-      tension: s['醋'], loneliness: s['孤独'], curiosity: s['好奇'], grievance: 0});
+    paintGauges({energy: s['精力'], attachment: s['依恋'], softness: s['柔和'], desire: s['渴望'],
+      tension: s['妒意'], loneliness: s['孤独感'], curiosity: s['好奇'], grievance: 0});
   }
   const rel = await getJSON('/relation');
   if (rel && rel.ok) {

@@ -35,6 +35,14 @@
 
     <a class="tab" href="settings.html" data-zh="检查与修复" data-en="Check &amp; repair">检查与修复</a>
   </div>
+  <div class="panel" style="padding:12px 14px">
+    <div style="display:flex;gap:8px;align-items:center">
+      <input id="mq" class="search" style="flex:1" placeholder="搜一条记忆，回车查"
+             data-zh-ph="搜一条记忆，回车查" data-en-ph="Search a memory, press Enter">
+      <button class="tbtn" id="mqgo" data-zh="搜索" data-en="Search">搜索</button>
+      <button class="tbtn" id="mqclear" data-zh="清空" data-en="Clear">清空</button>
+    </div>
+  </div>
   <div class="panel"><div class="list" id="list"></div></div>
 </div>
 <script src="i18n.js"></script><script src="api.js"></script><script src="nav.js"></script>
@@ -87,6 +95,19 @@ $('#q').oninput=paint;
     }).join('') : (lang()==='zh'?'还没有值得记下的第一次':'no firsts yet');
   } catch (e) {}
 })();
+async function searchMemory(){
+  const q = ($('#mq').value || '').trim();
+  const d = await getJSON('/memory' + (q ? ('?q=' + encodeURIComponent(q) + '&limit=200') : '?limit=60'));
+  items = (d && d.items) || [];
+  window.__total = (d && d.total) || items.length;
+  paint();
+  const c = $('#list'); if (c) c.scrollTop = 0;
+}
+document.addEventListener('DOMContentLoaded', function(){
+  const b = $('#mqgo'); if (b) b.onclick = searchMemory;
+  const c = $('#mqclear'); if (c) c.onclick = function(){ $('#mq').value = ''; searchMemory(); };
+  const i = $('#mq'); if (i) i.addEventListener('keydown', function(e){ if (e.key === 'Enter') searchMemory(); });
+});
 (async()=>{const d=await getJSON('/memory'); items=(d&&d.items)||[]; window.__total=(d&&d.total)||items.length; mountTools({lang:paint}); paint();
   const wk=(Date.now()/1000)-7*86400;
   $('#nAll').textContent=items.length;

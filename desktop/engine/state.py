@@ -6,7 +6,7 @@
     皮质醇 cortisol · 去甲肾上腺素 noradrenaline · GABA gaba · 睾酮 testosterone
 
 状态（给人看的，由激素 + 情绪算出，不独立存储）：
-    能量 · 黏 · 好奇 · 软 · 欲 · 醋 · 孤独
+    精力 · 依恋 · 好奇 · 柔和 · 渴望 · 妒意 · 孤独感
 
   python3 scripts/state.py show
   python3 scripts/state.py json
@@ -37,13 +37,13 @@ HORMONES = {
 
 # 状态名 → 由哪些激素算（权重）＋情绪修正
 RULES = {
-    "能量":   {"dopamine": .35, "noradrenaline": .35, "serotonin": .30, "minus": ["cortisol"]},
-    "黏":     {"oxytocin": 1.0, "minus": []},
+    "精力":   {"dopamine": .35, "noradrenaline": .35, "serotonin": .30, "minus": ["cortisol"]},
+    "依恋":     {"oxytocin": 1.0, "minus": []},
     "好奇":   {"dopamine": .6, "noradrenaline": .4, "minus": ["gaba"]},
-    "软":     {"oxytocin": .5, "serotonin": .3, "gaba": .2, "minus": ["cortisol"]},
-    "欲":     {"testosterone": .7, "dopamine": .3, "minus": []},
-    "醋":     {"testosterone": .5, "cortisol": .5, "minus": []},
-    "孤独":   {"oxytocin": .7, "serotonin": .3, "minus": []},   # 低 oxytocin 才是孤独
+    "柔和":     {"oxytocin": .5, "serotonin": .3, "gaba": .2, "minus": ["cortisol"]},
+    "渴望":     {"testosterone": .7, "dopamine": .3, "minus": []},
+    "妒意":     {"testosterone": .5, "cortisol": .5, "minus": []},
+    "孤独感":   {"oxytocin": .7, "serotonin": .3, "minus": []},   # 低 oxytocin 才是孤独
 }
 
 
@@ -71,14 +71,14 @@ def compute(hormones: dict | None = None, emotions: dict | None = None) -> dict:
             val += w * float(h.get(k, 0.5))
         for k in rule.get("minus", []):
             val -= 0.3 * float(h.get(k, 0.5))
-        if name == "孤独":
+        if name == "孤独感":
             val = 1.0 - clamp(val)          # 低催产素 → 高孤独
-        # 情绪修正：难过抬孤独、心疼抬软、生气抬醋
-        if name == "孤独":
+        # 情绪修正：难过抬孤独感、心疼抬柔和、生气抬妒意
+        if name == "孤独感":
             val += 0.3 * float(e.get("loneliness", 0))
-        if name == "软":
+        if name == "柔和":
             val += 0.2 * float(e.get("tenderness", 0))
-        if name == "醋":
+        if name == "妒意":
             val += 0.2 * float(e.get("jealousy", 0))
         out[name] = round(clamp(val), 2)
     return out

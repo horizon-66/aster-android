@@ -329,6 +329,39 @@ def start_job(kind: str, topic: str, seats: list, rounds: int = 2) -> dict:
     return {"ok": True, "id": jid}
 
 
+def list_saved(limit: int = 30) -> list:
+    """跑完的议事都存在 debates/*.json：列出来，点开能翻旧账。"""
+    import glob as _g
+    out = []
+    for f in _g.glob(os.path.join(OUT, "debate-*.json")):
+        try:
+            d = json.load(open(f, encoding="utf-8"))
+        except Exception:
+            continue
+        out.append({"file": os.path.basename(f),
+                    "topic": str(d.get("topic") or "")[:70],
+                    "rounds": d.get("rounds") or 0,
+                    "t": int(os.path.getmtime(f)),
+                    "ms": int(d.get("ms") or 0),
+                    "cost": d.get("cost") or 0})
+    out.sort(key=lambda x: -x["t"])
+    return out[:limit]
+
+
+def load_saved(name: str) -> dict:
+    """按文件名读一份旧议事。"""
+    name = os.path.basename(str(name or ""))
+    if not name.startswith("debate-") or not name.endswith(".json"):
+        return {"ok": False, "error": "文件名不对"}
+    p = os.path.join(OUT, name)
+    try:
+        d = json.load(open(p, encoding="utf-8"))
+        d["ok"] = True
+        return d
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:80]}
+
+
 def job_status(jid: str) -> dict:
     job = JOBS.get(jid)
     if not job:

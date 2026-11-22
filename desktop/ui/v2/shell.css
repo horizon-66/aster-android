@@ -5,7 +5,7 @@
 .mark svg{flex:0 0 auto}
 .mark b{font-size:13.5px;letter-spacing:.22em;font-weight:600}
 .nav a{font-size:13.5px;color:var(--ink2);padding:9px 11px;border-radius:10px;margin-bottom:2px;cursor:pointer}
-.nav a.on{background:#fff;color:var(--ink);box-shadow:var(--shadow-sm)}
+.nav a.on{background:#1b1c1f;color:#fff;box-shadow:0 8px 20px rgba(24,24,28,.16)}
 .nav a.on::before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;
   background:var(--pink);margin-right:8px;vertical-align:2px}
 .nav .foot{margin-top:auto;font-size:10.5px;color:var(--dim);line-height:1.9;padding:0 10px}
@@ -30,7 +30,7 @@ button,a,input,textarea,select,.tbtn,.nav a,.chip{-webkit-app-region:no-drag;app
 .fixedNav .mark{margin-bottom:26px;padding:0 8px}
 .fixedNav a{display:block;font-size:13.5px;color:var(--ink2);padding:9px 11px;border-radius:10px;
   margin-bottom:2px;cursor:pointer}
-.fixedNav a.on{background:#fff;color:var(--ink);box-shadow:var(--shadow-sm)}
+.fixedNav a.on{background:#1b1c1f;color:#fff;box-shadow:0 8px 20px rgba(24,24,28,.16)}
 .fixedNav a.on::before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;
   background:var(--pink);margin-right:8px;vertical-align:2px}
 .fixedNav .foot{margin-top:auto;font-size:10.5px;color:var(--dim);line-height:1.9;padding:0 10px;white-space:nowrap}

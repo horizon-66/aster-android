@@ -99,6 +99,13 @@ const $ = (s) => document.querySelector(s);
 const L = (zh, en) => (window.lang && lang() === 'en') ? en : zh;
 // 格子按引擎真实的「状态」来，不自己编名字
 // 格子 = 右上角那张「总表情」能显示的那些（来自已有表情清单），不自己造词
+const EXPR_EN = {
+  '平静': 'Calm', '开心': 'Happy', '大笑': 'Laughing', '害羞': 'Shy',
+  '不耐烦': 'Impatient', '生气': 'Angry', '难过': 'Sad', '低落': 'Low',
+  '发呆': 'Blank', '困': 'Sleepy', '惊讶': 'Surprised', '得意': 'Pleased',
+  '认真': 'Focused', '疲惫': 'Tired', '无聊': 'Bored',
+};
+const exprName = (zh) => (lang() === 'en' ? (EXPR_EN[zh] || zh) : zh);
 let EXPRS = [];
 async function loadStates() {
   const d = await fetch(API + '/face/states').then((r) => r.json()).catch(() => null);
@@ -131,7 +138,7 @@ async function loadSlots() {
   const find = (zh) => items.find((x) => (x.label || '') === zh || (x.file || '') === zh) || null;
   $('#slots').innerHTML = EXPRS.map(([zh, path]) => {
     const hit = path ? { path } : find(zh);
-    return '<div class="slot" data-en="' + zh + '" data-state="' + zh + '"><h4>' + zh + '</h4>' +
+    return '<div class="slot" data-en="' + zh + '" data-state="' + zh + '"><h4>' + exprName(zh) + '</h4>' +
       '<div class="ph">' + (hit ? '<img src="' + API + '/img?f=' + encodeURIComponent(hit.path) + '&t=1">' : L('还没有','none')) + '</div>' +
       '<div class="acts2" style="display:flex;gap:6px">' +
       '<button class="gen" style="flex:1">' + (hit ? L('重生成','regenerate') : L('生成','generate')) + '</button>' +
@@ -266,5 +273,8 @@ $('#psSave').onclick = async () => {
     const p2 = await fetch(API + '/persona').then((x) => x.json()).catch(() => null);
     if (p2 && p2.text) $('#psText').value = p2.text;
   };
+  if (window.mountTools) {
+    mountTools({ lang: () => { window.applyI18n(); loadSlots(); } });
+  }
 })();
 </script></body></html>

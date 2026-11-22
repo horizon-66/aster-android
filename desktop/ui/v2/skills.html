@@ -6,17 +6,18 @@
 <div class="dragbar"></div>
 <div class="page">
   <h1 class="ptitle" data-zh="技能" data-en="Skills">技能</h1>
-  <p class="lead" data-zh="可直接执行的技能列于上方；仅对对话风格起约束作用的条目列于下方。" data-en="Executable things on top; notes that shape the conversation below.">可执行的技能列于上方；仅影响对话的说明列于下方。</p>
+  <p class="lead" data-zh="分为三类：能动手执行的、写好的处理方式、只调整语气的方式。" data-en="Three groups: what she can execute, written approaches, and tone adjustments.">分为三类：能动手执行的、写好的处理方式、只调整语气的方式。</p>
   <div class="dark">
     <h5 class="h5" data-zh="概览" data-en="Overview">概览</h5>
     <div class="row2">
       <div><div class="num pink" id="nExe">0</div><div class="cap" data-zh="可执行" data-en="Executable">可执行</div></div>
-      <div><div class="num" id="nPrompt">0</div><div class="cap" data-zh="影响对话" data-en="Shapes dialogue">影响对话</div></div>
+      <div><div class="num" id="nPrompt">0</div><div class="cap" data-zh="说话方式" data-en="Wording">说话方式</div></div>
       <div><div class="num" id="nOn">0</div><div class="cap" data-zh="已启用" data-en="Enabled">已启用</div></div>
     </div>
   </div>
   <div class="panel"><h2 data-zh="可执行" data-en="Executable">可执行</h2><div id="plugins"></div></div>
-  <div class="panel"><h2 data-zh="影响对话" data-en="Shapes the dialogue">影响对话</h2><div id="prompts"></div></div>
+  <div class="panel"><h2 data-zh="处理方式" data-en="Approaches">处理方式</h2><p class="note small" data-zh="不是程序，是一段写好的处理方式：遇到这类事就按它办。" data-en="Not programs — a written approach she follows when such a task comes up.">不是程序，是一段写好的处理方式：遇到这类事就按它办。</p><div id="methods"></div></div>
+  <div class="panel"><h2 data-zh="说话方式" data-en="Wording">说话方式</h2><p class="note small" data-zh="只调整语气，不改内容，也不产生产物。" data-en="Tone only. Content stays the same; nothing is produced.">只调整语气，不改内容，也不产生产物。</p><div id="prompts"></div></div>
   <div class="panel"><h2 data-zh="安装新技能" data-en="Install">安装新技能</h2>
     <div class="toolbar">
       <input class="search" id="repo" placeholder="owner/repo">
@@ -28,14 +29,44 @@
 <script src="i18n.js"></script><script src="api.js"></script><script src="nav.js"></script>
 <script src="lang-toggle.js"></script>
 <script>
+// 内置技能/做法/插件的英文名与说明；外部安装的没有对照就保留原名
+const EN = {
+  'todo': ['To-do tidy', 'Turn a pile of tasks into an actionable list'],
+  'minutes': ['Meeting notes', 'Compress a transcript into decisions and follow-ups'],
+  'tone-soft': ['Softer wording', 'Rewrite harsh lines so they do not sting'],
+  'checklist': ['Packing list', 'What to bring, based on weather and occasion'],
+  'unit': ['Unit conversion', 'Length, weight, temperature, volume in one line'],
+  'express': ['Parcel tracking', 'Say where the package is, in one line'],
+  'error': ['Error reading', 'One plain line on what broke, one next step'],
+  'split': ['Schedule split', 'Break "a lot to do tomorrow" into time blocks'],
+  'ledger': ['Expense sorting', 'Group a day of spending into categories'],
+  'writer': ['Writing', 'Articles, posts, speeches: structured, no filler'],
+  'explain': ['Plain explanation', 'Explain a hard thing in everyday words, with one example'],
+  'weather': ['Weather', 'Current conditions and what to wear'],
+  'date_diff': ['Date difference', 'How many days between two dates'],
+  'frontend-design': ['Frontend design', 'Design guidance for interface work'],
+  'web-interface-guidelines': ['Interface guidelines', 'Rules for building web interfaces'],
+  'app-teardown': ['App teardown', 'Break an app down into screens and flows'],
+};
+const en = (x) => EN[x.name] || EN[x.id] || null;
+const nm = (x) => (lang() === 'en' && en(x) ? en(x)[0] : (x.title || x.name));
+const ds = (x) => (lang() === 'en' && en(x) ? en(x)[1] : (x.desc || ''));
 const $=(s)=>document.querySelector(s); let data={items:[],skills:[],prompts:[]};
 function paint(){
   document.documentElement.lang = lang()==='zh'?'zh-CN':'en'; applyI18n();
   $('#plugins').innerHTML = (data.items||[]).map(p=>'<div class="skill"><div><b>'+p.name+'</b><div class="d">'+
     (p.description||'')+'</div></div><span class="btn ghost">'+(p.enabled?(lang()==='zh'?'已启用':'on'):(lang()==='zh'?'已停用':'off'))+'</span></div>').join('')
     || '<div class="empty">'+(lang()==='zh'?'还没装可执行':'none yet')+'</div>';
-  $('#prompts').innerHTML = (data.prompts||[]).map(s=>'<div class="skill"><div><b>'+(s.title||s.name)+'</b><div class="d">'+
-    (s.desc||'')+'</div></div></div>').join('') || '<div class="empty">—</div>';
+  const STYLE = ['tone-soft'];   // 只改语气；「白话解释」是做法，不是语气
+  const isStyle = (x) => STYLE.indexOf(x.id) >= 0 ||
+    /软一点|语气/.test(((x.name || '') + (x.title || '')));
+  const USES = window.__uses || {};
+  const card = (s) => '<div class="skill"><div><b>'+nm(s)+'</b><div class="d">'+ds(s)+'</div></div>' +
+    (USES[s.name] ? '<span style="font-size:11px;color:var(--dim);flex:0 0 auto">用过 ' + USES[s.name] + ' 次</span>' : '') +
+    '</div>';
+  const all = data.prompts || [];
+  $('#methods').innerHTML = all.filter(x => !isStyle(x)).map(card).join('') || '<div class="empty">—</div>';
+  $('#prompts').innerHTML = all.filter(isStyle).map(card).join('') || '<div class="empty">—</div>';
 }
 $('#installBtn').onclick = async () => {
   const r=$('#repo').value.trim(); if(!r) return;
@@ -43,7 +74,9 @@ $('#installBtn').onclick = async () => {
   const d=await postJSON('/ext/install_github',{repo:r});
   $('#instMsg').textContent = d&&d.ok ? (d.result||'ok') : ((d&&d.error)||'failed');
 };
-(async()=>{const d=await getJSON('/ext/list'); data=d||data; mountTools({lang:paint}); paint();
+(async()=>{ try { const u = await getJSON('/ext/usage'); window.__uses = {};
+  (u && u.items || []).forEach(function(x){ window.__uses[x.name] = x.n; }); } catch (e) {}
+const d=await getJSON('/ext/list'); data=d||data; mountTools({lang:paint}); paint();
   $('#nExe').textContent=(data.items||[]).length;
   $('#nPrompt').textContent=(data.prompts||[]).length;
   $('#nOn').textContent=(data.items||[]).filter(x=>x.enabled).length;})();

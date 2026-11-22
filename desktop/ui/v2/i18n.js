@@ -50,6 +50,11 @@ window.applyI18n = () => {
     const v = el.getAttribute('data-' + lang());
     if (v !== null) el.innerHTML = v;
   });
+  // 输入框占位、下拉里的选项这类，也得跟着语言走
+  document.querySelectorAll('[data-zh-ph]').forEach(el => {
+    const v = el.getAttribute('data-' + lang() + '-ph');
+    if (v !== null) el.setAttribute('placeholder', v);
+  });
 };
 
 /* 2026-11-22：不默认女性，也不替他决定。

@@ -491,6 +491,25 @@ def resume(jid: str) -> dict:
     return {"ok": True, "id": jid}
 
 
+def list_jobs(limit: int = 30) -> list:
+    """过去开过的单子：从磁盘捡，按时间倒序。"""
+    import glob as _g
+    out = []
+    for jf in _g.glob(os.path.join(ROOT, "*", "job.json")):
+        try:
+            d = json.load(open(jf, encoding="utf-8"))
+        except Exception:
+            continue
+        out.append({"id": d.get("id") or os.path.basename(os.path.dirname(jf)),
+                    "task": str(d.get("task") or "")[:70],
+                    "state": d.get("state") or "",
+                    "t": int(os.path.getmtime(jf)),
+                    "ms": int(d.get("ms") or 0),
+                    "steps": len(d.get("steps") or [])})
+    out.sort(key=lambda x: -x["t"])
+    return out[:limit]
+
+
 def status(jid: str) -> dict:
     job = JOBS.get(jid)
     if not job:

@@ -204,6 +204,54 @@ app.whenReady().then(async () => {
       log('health restart result', JSON.stringify(engineStarting));
     } catch (e) {}
   }, 30000);
+  // ———— 收藏夹：预览是原生视图，永远盖在网页内容上面，所以列表必须单独开一个小窗口 ————
+  let bmWin = null;
+  ipcMain.handle('bm:open', async (e, items, rect) => {
+    try { if (bmWin && !bmWin.isDestroyed()) { bmWin.close(); bmWin = null; } } catch (err) {}
+    const list = Array.isArray(items) ? items.slice(-40) : [];
+    const host = BrowserWindow.fromWebContents(e.sender);
+    const b = host ? host.getBounds() : { x: 200, y: 200, width: 900, height: 700 };
+    const w = 340, h = Math.min(420, 76 + Math.max(1, list.length) * 34);
+    bmWin = new BrowserWindow({
+      width: w, height: h,
+      x: Math.round(b.x + ((rect && rect.x) || b.width - w - 20)),
+      y: Math.round(b.y + ((rect && rect.y) || 96)),
+      frame: false, resizable: false, movable: false, minimizable: false, maximizable: false,
+      fullscreenable: false, skipTaskbar: true, alwaysOnTop: true, show: false,
+      backgroundColor: '#ffffff', hasShadow: true,
+      webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false },
+    });
+    bmWin.setAlwaysOnTop(true, 'pop-up-menu');
+    const row = (x) => '<div class="r"><a href="' + x.url + '">' +
+      String(x.url || x.title || '').replace(/^https?:\/\//, '').slice(0, 60) +
+      '</a><span class="x" data-del="' + encodeURIComponent(x.url) + '">×</span></div>';
+    const html = '<!doctype html><meta charset="utf-8"><style>' +
+      'body{margin:0;font:12px -apple-system,"PingFang SC";color:#16171a;background:#fff}' +
+      'h4{margin:0;padding:11px 14px 8px;font-size:11px;letter-spacing:.1em;color:#9a9aa1;border-bottom:1px solid #f0ece5;font-weight:500}' +
+      '.r{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid #f7f4ef}' +
+      '.r:hover{background:#faf8f4}.r a{flex:1;color:#16171a;text-decoration:none;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}' +
+      '.x{color:#b9b4ab;cursor:pointer;padding:0 4px}.e{padding:16px 14px;color:#9a9aa1}' +
+      '</style><h4>收藏夹</h4>' +
+      (list.length ? list.slice().reverse().map(row).join('') : '<div class="e">还没有收藏</div>');
+    await bmWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+    bmWin.webContents.on('will-navigate', (ev, url) => {
+      ev.preventDefault();
+      const u = String(url);
+      try {
+        if (u.startsWith('aster-del:')) e.sender.send('bm:del', decodeURIComponent(u.slice(10)));
+        else e.sender.send('bm:pick', u);
+      } catch (err) {}
+      try { bmWin.close(); } catch (err) {}
+    });
+    try {
+      await bmWin.webContents.executeJavaScript(
+        "document.querySelectorAll('[data-del]').forEach(function(x){x.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();location.href='aster-del:'+x.dataset.del;});});");
+    } catch (err) {}
+    bmWin.show();
+    bmWin.on('blur', () => { try { if (bmWin && !bmWin.isDestroyed()) bmWin.close(); } catch (err) {} });
+    return { ok: true };
+  });
+
   // ———— 预览器：一个窗口里用 WebContentsView 放多个页面（替代 webview） ————
   const PREVIEW = new Map();   // win.id -> {tabs:[{id,view,url}], active}
   const CHROME_H = 118;        // 上方页签条 + 地址栏占位

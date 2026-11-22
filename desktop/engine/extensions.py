@@ -71,7 +71,7 @@ LIBRARY = [
     {"id": "minutes", "name": "会议纪要", "icon": "🗒",
      "desc": "把流水账压成结论和待办",
      "body": "# 会议纪要\n\n用在：他说「整理下会议记录 / 这段话太长帮我压一下」。\n\n做法：\n- 先一句结论，再列 3 条以内要点\n- 谁要做什么单独一行\n- 没提到的人不写\n"},
-    {"id": "tone-soft", "name": "话说软一点", "icon": "🫧",
+    {"id": "tone-soft", "name": "话说软一点", "icon": "🫧", "kind": "style",
      "desc": "把硬邦邦的话改得不刺人",
      "body": "# 话说软一点\n\n用在：他说「帮我把这句话说得自然点 / 委婉点」。\n\n做法：\n- 保留原意，去掉命令感和指责感\n- 给他两版：偏客气、偏亲近\n- 不解释为什么\n"},
     {"id": "checklist", "name": "出门清单", "icon": "🎒",
@@ -95,9 +95,9 @@ LIBRARY = [
     {"id": "writer", "name": "写作", "icon": "✍️",
      "desc": "写文章、公众号、演讲稿，有结构不注水",
      "body": "# 写作\n\n用在：他说「帮我写一篇…」「改成文章」「写个稿」。\n\n做法：\n- 先问一句目标读者和篇幅（只问一次，别追问）\n- 开头三句内进入正题，不铺垫、不客套\n- 每一段只讲一件事，句子短，能念出来\n- 不写「在这个时代」「不得不说」这类空话\n- 结尾给一句能记住的话，不写「希望对你有帮助」\n- 要标题就给三个备选，风格拉开\n"},
-    {"id": "explain", "name": "讲人话", "icon": "💡",
-     "desc": "把复杂的话翻成大白话",
-     "body": "# 讲人话\n\n用在：他说「这是什么原理 / 讲简单点」。\n\n做法：\n- 先用一句大白话解释\n- 再举一个生活里的例子\n- 不确定的部分说「这个我不确定」\n"},
+    {"id": "explain", "name": "白话解释", "icon": "💡",
+     "desc": "用日常说法把难点讲清楚，并举一个例子",
+     "body": "# 白话解释\n\n用在：他说「这是什么原理 / 讲简单点」。\n\n做法：\n- 先用一句大白话解释\n- 再举一个生活里的例子\n- 不确定的部分说「这个我不确定」\n"},
 ]
 
 
@@ -146,7 +146,9 @@ def catalog() -> dict:
             except Exception:
                 items = []
     if not items:
-        items = [dict(it, version="1.0", content=it.get("body", "")) for it in LIBRARY]
+        # 只影响说法的条目（讲人话、话说软一点）不算技能，不进商店
+        items = [dict(it, version="1.0", content=it.get("body", ""))
+                 for it in LIBRARY if it.get("kind") != "style"]
     installed = {s["name"] for s in skills()}
     for it in items:
         it["installed"] = (it.get("id") in installed)
@@ -369,11 +371,24 @@ def skills() -> list[dict]:
         if os.path.isfile(p):
             m = meta.get(name) or {}
             _runnable = os.path.isfile(os.path.join(base, name, "main.py"))
+            # 自装的技能：名字取正文第一个标题，说明取标题后第一行，别在界面上显示目录名
+            _title, _desc = name, ""
+            try:
+                _lines = [x.strip() for x in open(p, encoding="utf-8").read().splitlines()]
+                _lines = [x for x in _lines if x]
+                for i, x in enumerate(_lines):
+                    if x.startswith("# "):
+                        _title = x[2:].strip()
+                        _rest = [y for y in _lines[i + 1:] if not y.startswith("#")]
+                        _desc = _rest[0][:40] if _rest else ""
+                        break
+            except Exception:
+                pass
             out.append({"name": name, "path": p, "runnable": _runnable,
                         "chars": os.path.getsize(p),
-                        "title": m.get("name") or name,
+                        "title": m.get("name") or _title,
                         "icon": m.get("icon") or "📘",
-                        "desc": m.get("desc") or "自装的技能",
+                        "desc": m.get("desc") or _desc or "自装的技能",
                         "triggers": list(SKILL_TRIGGERS.get(name, ()))})
     return out
 
