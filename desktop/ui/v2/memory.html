@@ -110,7 +110,7 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 (async()=>{const d=await getJSON('/memory'); items=(d&&d.items)||[]; window.__total=(d&&d.total)||items.length; mountTools({lang:paint}); paint();
   const wk=(Date.now()/1000)-7*86400;
-  $('#nAll').textContent=items.length;
+  $('#nAll').textContent=window.__total||items.length;
   $('#nWeek').textContent=items.filter(x=>(x.ts||0)>wk).length;
   $('#nTag').textContent=new Set(items.map(x=>x.tag).filter(Boolean)).size;
   const base=await findAPI(); const b=$('#mapBtn'); if(b) b.href=(base||'')+'/brain-map';})();

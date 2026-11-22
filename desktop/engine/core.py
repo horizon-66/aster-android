@@ -3245,7 +3245,7 @@ html,body{height:100%;height:100dvh;margin:0}
 body{display:flex;flex-direction:column;background:var(--white);color:var(--ink);
   font-family:var(--sans);-webkit-font-smoothing:antialiased;padding-top:env(safe-area-inset-top)}
 /* 顶栏：无底色，只有一条极细的分隔 */
-header{flex:0 0 auto;display:flex;align-items:center;gap:10px;height:54px;padding:0 12px 0 6px;
+header{flex:0 0 auto;display:flex;align-items:center;gap:12px;height:60px;padding:0 18px 0 10px;
   border-bottom:1px solid var(--hair);background:rgba(255,255,255,.9);backdrop-filter:blur(18px)}
 #menu{width:40px;height:40px;border:0;background:none;color:var(--ink-2);display:grid;place-items:center}
 #menu svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round}
@@ -3260,22 +3260,33 @@ main{flex:1;min-height:0;display:flex;flex-direction:column}
 .pane{flex:1;min-height:0;display:none;flex-direction:column}
 .pane.on{display:flex}
 /* 对话：没有气泡，只有文字与留白 */
-#log{flex:1;overflow:auto;padding:10px 22px 6px;-webkit-overflow-scrolling:touch}
+#log{flex:1;overflow:auto;padding:20px 18px 14px;-webkit-overflow-scrolling:touch;
+  scrollbar-width:none}
+#log::-webkit-scrollbar{display:none}
 .day{display:flex;align-items:center;gap:12px;margin:26px 0 22px;font-size:11px;color:var(--ink-3)}
 .day::before,.day::after{content:"";flex:1;height:1px;background:var(--hair)}
-.turn{margin:0 0 20px;max-width:86%}
-.turn p{margin:0;font-size:15px;line-height:1.78;white-space:pre-wrap;word-break:break-word}
+.turn{display:flex;gap:10px;margin:0 0 18px;max-width:88%}
+.turn.her{align-items:flex-start}
+.turn.me{margin-left:auto;flex-direction:row-reverse}
+.turn .av{flex:0 0 30px;width:30px;height:30px;border-radius:50%;background:#EFEDE8;margin-top:2px;
+  background-size:cover;background-position:center;box-shadow:0 0 0 1px rgba(0,0,0,.04)}
+.turn p{margin:0;font-size:15.5px;line-height:1.7;white-space:pre-wrap;word-break:break-word;
+  padding:10px 14px;border-radius:16px;max-width:calc(100% - 40px)}
+.turn.her p{background:#fff;border:1px solid #ECEAE4;border-bottom-left-radius:6px;color:#17181B}
+.turn.me p{background:#EDEAE3;border-bottom-right-radius:6px;color:#17181B}
+.turn.sys{display:block;text-align:center;margin:8px 0 14px}
+.turn.sys p{padding:0;background:none;border:0;font-size:12px;color:#9a9aa1;text-align:center}
 .turn.me{margin-left:auto;text-align:right}
 .turn.me p{color:var(--ink-2)}
 .turn.sys{max-width:none;text-align:center;margin:10px 0 14px}
 .turn.sys p{font-size:12px;color:var(--ink-3)}
 .turn .at{display:block;margin-top:6px;font-size:11px;color:#C4C4C9}
 /* 输入 */
-footer{flex:0 0 auto;padding:8px 16px calc(12px + env(safe-area-inset-bottom));
+footer{flex:0 0 auto;padding:12px 20px calc(16px + env(safe-area-inset-bottom));
   background:rgba(255,255,255,.94);backdrop-filter:blur(18px);border-top:1px solid var(--hair)}
-.field{display:flex;align-items:center;gap:6px;background:#F7F7F9;border-radius:22px;
-  padding:4px 6px 4px 16px}
-.field input{flex:1;min-width:0;height:38px;border:0;background:none;outline:none;
+.field{display:flex;align-items:center;gap:8px;background:#F7F7F9;border-radius:24px;
+  padding:5px 7px 5px 18px}
+.field input{flex:1;min-width:0;height:40px;border:0;background:none;outline:none;
   font-family:var(--sans);font-size:15px;color:var(--ink)}
 .field input::placeholder{color:var(--ink-3)}
 #assign{width:30px;height:30px;border:0;background:none;color:var(--ink-3);font-size:18px;line-height:1}
@@ -3313,9 +3324,8 @@ footer{flex:0 0 auto;padding:8px 16px calc(12px + env(safe-area-inset-bottom));
 <header>
  <button id="menu" aria-label="菜单"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
  <div class="who"><b id="nm">Aster</b><span id="st">正在连上你的电脑…</span></div>
- <div id="net" title="离线"></div>
+ 
 </header>
- <div class="dot" id="net" title="离线"></div>
 </div>
 
 <main>
@@ -3358,14 +3368,27 @@ footer{flex:0 0 auto;padding:8px 16px calc(12px + env(safe-area-inset-bottom));
 </div>
 
 <script>
+(function(){
+  const sync = () => { try { if (window.AsterNative && window.AsterNative.apply) window.AsterNative.apply('light'); } catch(e){} };
+  sync(); setTimeout(sync, 500); setTimeout(sync, 1500);
+})();
+
 const T = new URLSearchParams(location.search).get('t') || '';
 const $ = (s) => document.querySelector(s);
 const api = (u, o) => fetch(u, Object.assign({headers: {'X-Pair': T, 'Content-Type': 'application/json'}}, o || {}));
 
 /* ---------- 对话 ---------- */
+let FACE_SRC = '';
 function add(text, who){
   const wrap = document.createElement('div');
   wrap.className = 'turn ' + (who === 'me' ? 'me' : who === 'sys' ? 'sys' : 'her');
+  if (!who || who === 'her') {
+    const av = document.createElement('div');
+    av.className = 'av';
+    if (FACE_SRC) av.style.backgroundImage = 'url(' + FACE_SRC + ')';
+    else av.style.display = 'none';
+    wrap.appendChild(av);
+  }
   const p = document.createElement('p'); p.textContent = text;
   wrap.appendChild(p);
   const L = $('#log'); L.appendChild(wrap); L.scrollTop = L.scrollHeight;
@@ -3525,7 +3548,10 @@ async function boot(){
   try {
     const f = await api('/face').then(x=>x.json());
     const nm = $('#nm').textContent || 'A';
-    if (f.path) { const im = $('#av'); if (im) im.src = '/img?f=' + encodeURIComponent(f.path);
+    if (f.path) { FACE_SRC = '/img?f=' + encodeURIComponent(f.path);
+      // 历史先渲染完了，这里把已经画出来的头像补上图
+      document.querySelectorAll('#log .av').forEach(function(a){ a.style.backgroundImage = 'url(' + FACE_SRC + ')'; });
+      const im = $('#av'); if (im) im.src = FACE_SRC;
       const i2 = $('#av2'); i2.style.display='block'; i2.src = '/img?f=' + encodeURIComponent(f.path); $('#avph').style.display='none'; }
     else { $('#avph').textContent = nm.slice(0,1); }
     $('#nm2').textContent = nm;
@@ -3600,6 +3626,19 @@ def private_net_state() -> dict:
 
 
 TUNNEL = {"proc": None, "url": "", "started": 0}
+NAMED_HOST = "aster.asternest.net"          # 固定域名，走 Cloudflare 命名隧道
+NAMED_URL = "https://" + NAMED_HOST
+
+
+def _named_alive() -> bool:
+    """命名隧道是否在跑（launchd 常驻，这里只查进程）。"""
+    try:
+        import subprocess
+        out = subprocess.run(["pgrep", "-fl", "cloudflared tunnel run aster"],
+                             capture_output=True, text=True, timeout=3).stdout
+        return "tunnel run aster" in out
+    except Exception:
+        return False
 
 
 def _cf_bin() -> str:
@@ -3613,6 +3652,9 @@ def _cf_bin() -> str:
 
 
 def tunnel_state() -> dict:
+    if _named_alive():
+        return {"ok": True, "running": True, "url": NAMED_URL, "named": True,
+                "started": TUNNEL.get("started") or 0}
     p = TUNNEL.get("proc")
     alive = bool(p and p.poll() is None)
     return {"ok": True, "running": alive, "url": TUNNEL.get("url") if alive else "",
@@ -3621,6 +3663,8 @@ def tunnel_state() -> dict:
 
 def tunnel_start() -> dict:
     """开一条临时外网通道，让手机在外面也能连回这台电脑。"""
+    if _named_alive():
+        return {"ok": True, **tunnel_state()}
     p0 = TUNNEL.get("proc")
     if p0 and p0.poll() is None and TUNNEL.get("url"):
         return {"ok": True, **tunnel_state()}
@@ -3677,6 +3721,15 @@ def pair_new(force: bool = False) -> dict:
         if old.get("token") and int(time.time()) - int(old.get("ts") or 0) < 30 * 86400:
             tok = old["token"]
             url = old.get("url") or ""
+            # 地址换了（比如从临时通道换成固定域名）就重建，别把旧地址塞进二维码
+            try:
+                from urllib.parse import urlparse as _up
+                _want = NAMED_URL if _named_alive() else ""
+                if _want and _up(url).netloc != _up(_want).netloc:
+                    url = _want + "/m?t=" + tok
+                    _save(PAIR_FILE, {"token": tok, "url": url, "ts": int(time.time())})
+            except Exception:
+                pass
             if url:
                 img = qrcode.make(url)
                 buf = io.BytesIO()
@@ -3684,7 +3737,16 @@ def pair_new(force: bool = False) -> dict:
                 return {"ok": True, "url": url, "token": tok, "reused": True,
                         "qr": "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()}
     tok = secrets.token_hex(8)
-    url = "http://" + _lan_ip() + ":" + str(os.environ.get("ASTER_PORT") or 8777) + "/m?t=" + tok
+    # 二维码里的地址：有隧道就用隧道（手机在外也能连、且是 https，鸿蒙不会拦），
+    # 没有才退回局域网地址。
+    _tn = NAMED_URL if _named_alive() else ""
+    try:
+        if not _tn and TUNNEL.get("proc") and TUNNEL["proc"].poll() is None and TUNNEL.get("url"):
+            _tn = str(TUNNEL["url"]).rstrip("/")
+    except Exception:
+        pass
+    url = (_tn + "/m?t=" + tok) if _tn else (
+        "http://" + _lan_ip() + ":" + str(os.environ.get("ASTER_PORT") or 8777) + "/m?t=" + tok)
     _save(PAIR_FILE, {"token": tok, "url": url, "ts": int(time.time())})
     img = qrcode.make(url)
     buf = io.BytesIO()
@@ -4885,6 +4947,7 @@ _DRY = False
 
 def chat(text: str) -> dict:
     global _LAST_TALK
+    _soothe = False
     ensure_defaults()
     _SEEN_CALLS.clear()
     t0 = time.time()
@@ -4951,29 +5014,24 @@ def chat(text: str) -> dict:
                 "keywords": [], "compressed": False, "brief": "", "memory_hits": 0,
                 "plan": [], "ms": int((time.time() - t0) * 1000)}
 
-    # 哄：几句话把情绪按下来
+    # 哄：把情绪按下来，但话仍由她自己说。以前这里直接回一句写死的「嗯……好一点了」，
+    # 所以只要他说「乖」，不管上文是什么都是同一句。
     if re.search(r"(别气|别生气|不气|抱抱|抱一下|乖|哄哄|对不起|我错了|心疼你|摸摸头|别难过)", text or ""):
         try:
             import endo as _en
             _st = _en.load() or {}
+
             def _cl(v):
                 return max(0.0, min(1.0, float(v)))     # 情绪量永远在 [0,1]，哄不出假性亢奋
+
             _st["cortisol"] = _cl(float(_st.get("cortisol") or 0) - 0.25)
             _st["energy"] = _cl(float(_st.get("energy") or 0.5) + 0.10)
             _st["attachment"] = _cl(float(_st.get("attachment") or 0.4) + 0.15)
             _st["last_touch"] = time.time()
             _en.save(_st)
-            soothe_applied = True
+            _soothe = True
         except Exception:
-            soothe_applied = False
-        _say3 = ("嗯……好一点了" if soothe_applied else "嗯，听到了")
-        HISTORY.append({"role": "user", "content": text[:200]})
-        chat_log({"who": "me", "text": text, "ts": int(time.time())})
-        HISTORY.append({"role": "assistant", "content": _say3[:300]})
-        chat_log({"who": "her", "text": _say3, "ts": int(time.time())})
-        return {"ok": True, "reply": _say3, "intent": "chat", "need": "local_ok",
-                "keywords": [], "compressed": False, "brief": "", "memory_hits": 0,
-                "plan": [], "mood": mood_now(), "ms": int((time.time() - t0) * 1000)}
+            _soothe = False
 
     # 授权：一句话发一张委托卡
     if re.search(r"(授权|交给你|你定|你来决定|随便你)", text or ""):
@@ -5228,6 +5286,9 @@ def chat(text: str) -> dict:
                 + ("他发来一段长文，要点是：" if _long else "他现在说：")
                 + text_for_cloud[:300] + "\n")
         _mt = 1200
+
+    if _soothe:
+        base += "（他刚在哄你，语气可以软一点；但说实话，不要套话，也别回一句固定的短句。）\n"
 
     # 2026-11-22：这里原来还有一次无条件的 out = cloud(base)，等于每轮生成两遍、
     # 第二遍（max_tokens=400）把第一遍覆盖掉。现在只生成一次；「没记忆别编」的提醒

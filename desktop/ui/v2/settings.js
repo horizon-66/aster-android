@@ -247,7 +247,7 @@ function wireExtras() {
   const wan = $('#wanBtn');
   if (wan) wan.onclick = async () => {
     $('#wanBox').style.display = 'block';
-    $('#wanBox').textContent = lang() === 'zh' ? '正在建立外网通道，约需十秒……' : 'opening a tunnel…';
+    $('#wanBox').textContent = lang() === 'zh' ? '正在检查固定通道…' : 'checking the fixed tunnel…';
     const r = await postJSON('/tunnel/start', {}).catch(() => null);
     if (r && r.ok) {
       $('#wanBox').innerHTML =
@@ -255,7 +255,7 @@ function wireExtras() {
         '<div>' + (lang() === 'zh' ? '手机扫码，或用这个地址：' : 'Scan or open:') + '</div>' +
         '<div style="word-break:break-all">' + r.url + '</div>' +
         '<div style="color:var(--dim)">' + (lang() === 'zh'
-          ? '此通道为临时地址，关闭后失效；期间所有外部访问均需该令牌。' : 'Temporary address; closes when stopped.') + '</div>' +
+          ? '固定地址，电脑开着即可访问；所有外部访问均需该令牌。' : 'Fixed address while this computer is on.') + '</div>' +
         '<button class="btn ghost" id="wanStop" style="margin-top:8px">' + (lang() === 'zh' ? '关闭通道' : 'Close') + '</button>';
       const st = $('#wanStop');
       if (st) st.onclick = async () => {
