@@ -208,6 +208,31 @@ def compare(question: str, sources: list) -> dict:
         return {"ok": False, "why": str(e)[:80]}
 
 
+# 各家现价（元 / 百万 token：输入、输出）。本地模型不计费。
+# 价格会变，用户可以用 providers.json 里的 price_in/price_out 覆盖。
+PRICES = {
+    "deepseek": (2.0, 8.0),
+    "qwen": (2.4, 9.6),
+    "doubao": (0.8, 2.0),
+    "openai": (1.1, 4.4),
+    "gemini": (0.5, 1.5),
+    "ollama": (0.0, 0.0),
+}
+DEFAULT_PRICE = (2.0, 8.0)
+
+
+def _price(c: dict) -> tuple:
+    """这家供应商怎么算钱：先用配置里的覆盖，再查表，最后给个默认。"""
+    try:
+        pin = c.get("price_in")
+        pout = c.get("price_out")
+        if pin is not None and pout is not None:
+            return float(pin), float(pout)
+    except Exception:
+        pass
+    return PRICES.get(str(c.get("provider") or c.get("name") or "").lower(), DEFAULT_PRICE)
+
+
 def text(prompt: str, max_tokens: int = 1200, temperature: float = 0.8,
          force: bool = False) -> dict:
     """自由文本生成（写文章、写脚本这类）：只回正文，不要 JSON。
@@ -236,9 +261,12 @@ def text(prompt: str, max_tokens: int = 1200, temperature: float = 0.8,
             d = json.loads(r.read().decode())
         out = ((d.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
         usage = d.get("usage") or {}
-        cost = round(usage.get("prompt_tokens", 0) * 1e-6 + usage.get("completion_tokens", 0) * 2e-6, 5)
+        _pin, _pout = _price(c)
+        _pt = int(usage.get("prompt_tokens") or 0)
+        _ct = int(usage.get("completion_tokens") or 0)
+        cost = round(_pt / 1e6 * _pin + _ct / 1e6 * _pout, 6)
         _log({"ts": int(time.time()), "level": 3, "ok": True, "why": "text",
-              "cost_cny": cost, "tokens": usage})
+              "provider": c.get("provider") or "", "cost_cny": cost, "tokens": usage})
         return {"ok": bool(out.strip()), "text": out.strip(), "cost_cny": cost}
     except Exception as e:
         _log({"ts": int(time.time()), "level": 3, "ok": False, "why": str(e)[:80]})

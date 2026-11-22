@@ -148,6 +148,15 @@
 (function () {
   const box = document.getElementById('hello');
   if (!box) return;
+  // 这段遮罩只在「这次打开软件」时出现一次。
+  // 从别页导航回对话也是一次整页加载，不该再播一遍。
+  try {
+    // 只有主进程「打开软件」那一次会带 boot=1；页内跳转回来没有这个参数。
+    const boot = new URLSearchParams(location.search).get('boot') === '1';
+    const played = sessionStorage.getItem('aster.hello') === '1';
+    if (!boot && played) { box.remove(); return; }
+    sessionStorage.setItem('aster.hello', '1');
+  } catch (e) {}
   const line = document.getElementById('helloLine');
   const zh = ['今天想说什么', '我在这儿', '今天过得怎么样'];
   const en = ['What is it today', 'I am here', 'How was your day'];

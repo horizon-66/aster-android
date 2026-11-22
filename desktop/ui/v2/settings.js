@@ -145,12 +145,18 @@ async function loadUsage() {
   try {
     const u = await getJSON('/usage');
     if (!u || !u.ok) { $('#usageBox').textContent = '—'; return; }
+    const c1 = '¥' + Number(u.cost || 0).toFixed(2);
+    const c7 = '¥' + Number(u.cost_week || 0).toFixed(2);
     $('#usageBox').innerHTML =
       (lang() === 'zh'
-        ? '累计调用 <b>' + fmt(u.calls) + '</b> 次 · 输入 <b>' + fmt(u.prompt_tok) + '</b> tok · 输出 <b>' +
-          fmt(u.out_tok) + '</b> tok · 平均 <b>' + (u.avg_ms || 0) + '</b> ms'
-        : '<b>' + fmt(u.calls) + '</b> calls · prompt <b>' + fmt(u.prompt_tok) + '</b> tok · out <b>' +
-          fmt(u.out_tok) + '</b> tok · avg <b>' + (u.avg_ms || 0) + '</b> ms');
+        ? '今日调用 <b>' + fmt(u.calls) + '</b> 次 · 输入 <b>' + fmt(u.prompt_tok) + '</b> tok · 输出 <b>' +
+          fmt(u.out_tok) + '</b> tok · 平均 <b>' + (u.avg_ms || 0) + '</b> ms' +
+          '<br>今日花费 <b>' + c1 + '</b> · 近七日 <b>' + c7 + '</b>' +
+          '<br><span style="color:var(--dim);font-size:11.5px">按云端现价估算，实际以账单为准</span>'
+        : 'Today: <b>' + fmt(u.calls) + '</b> calls · prompt <b>' + fmt(u.prompt_tok) + '</b> tok · out <b>' +
+          fmt(u.out_tok) + '</b> tok · avg <b>' + (u.avg_ms || 0) + '</b> ms' +
+          '<br>Today <b>' + c1 + '</b> · last 7 days <b>' + c7 + '</b>' +
+          '<br><span style="color:var(--dim);font-size:11.5px">Estimated at current cloud pricing</span>');
   } catch (e) {}
 }
 

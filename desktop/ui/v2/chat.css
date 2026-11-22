@@ -1,6 +1,6 @@
 .chat{display:flex;flex-direction:column;min-width:0;overflow:hidden}
 .chat .head{height:56px;flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:0 20px;border-bottom:1px solid var(--line)}
-.chat .name{font-size:14px;font-weight:600}
+.chat .name{font-size:14px;font-weight:600;white-space:nowrap;flex:0 0 auto}
 .chat .meta{font-family:var(--mono);font-size:11px;color:var(--dim)}
 .chat .sp{flex:1}
 .chat .log{flex:1 1 auto;min-height:0;overflow:auto;padding:22px 22px 0}

@@ -125,10 +125,25 @@ function createWindow() {
                       webviewTag: true, sandbox: false },
   });
   // 2026-11-20：新界面（v2）成为默认；旧界面保留在 ui/index.html，可从新界面的「旧界面」入口进入
-  const _v2 = path.join(__dirname, 'ui', 'v2', 'intro.html');   // 先开场信，再进主界面
-  const _entry = fs.existsSync(_v2) ? _v2 : path.join(__dirname, 'ui', 'index.html');
+  // 开场信只在「还没走完引导」时出现；走过一次就直接进主界面，不再每次闪一下。
+  // 想重看：设置里点「重新阅读开场信」，或者命令行加 ASTER_INTRO=1。
+  const _v2dir = path.join(__dirname, 'ui', 'v2');
+  const _intro = path.join(_v2dir, 'intro.html');
+  const _home = path.join(_v2dir, 'index.html');
+  let _entry = _home;
+  try {
+    const _ob = path.join(userDataDir(), 'onboarding.json');
+    const _done = fs.existsSync(_ob) && (JSON.parse(fs.readFileSync(_ob, 'utf8')).finished === true);
+    if (!_done || process.env.ASTER_INTRO === '1') _entry = _intro;
+  } catch (e) {
+    _entry = fs.existsSync(_intro) ? _intro : _home;
+  }
+  if (!fs.existsSync(_entry)) _entry = fs.existsSync(_intro) ? _intro : path.join(__dirname, 'ui', 'index.html');
   log('loadFile', _entry);
-  win.loadFile(_entry);
+  // 只在「打开软件」这一次给对话页带上 boot=1，开场遮罩据此只播一遍；
+  // 从别的页面导航回来（没带这个参数）就不再播。
+  try { win.loadFile(_entry, { query: _entry.endsWith('index.html') ? { boot: '1' } : {} }); }
+  catch (e) { win.loadFile(_entry); }
   win.webContents.on('did-fail-load', (e, c, d) => log('did-fail-load', c, d));
   win.webContents.on('console-message', (e, lvl, msg) => log('console', lvl, msg.slice(0, 120)));
   // 2026-11-20：语音要用麦克风，Electron 默认会拒，这里明确放行 media

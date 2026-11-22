@@ -3788,17 +3788,42 @@ def usage_stats(week: bool = False) -> dict:
         for k in agg:
             agg[k] += int(r.get(k) or 0)
     src = (rows[0] or {"calls": 0, "prompt_tok": 0, "out_tok": 0, "ms": 0}) if not week else agg
-    # 花钱：按 DeepSeek 现价估（输入 2 元/百万，输出 8 元/百万），换供应商就改这两个数
-    _pin = float(os.environ.get("ASTER_PRICE_IN", "2.0"))
-    _pout = float(os.environ.get("ASTER_PRICE_OUT", "8.0"))
-
-    def _cost(prompt_tok, out_tok):
-        return round(prompt_tok / 1e6 * _pin + out_tok / 1e6 * _pout, 4)
+    # 花钱：不再按一家价格估，直接汇总每次调用记下的真实花费（各供应商按各自价格算）。
+    def _cost_from_log(days: int) -> float:
+        import json as _j
+        p = os.path.join(HOME, "logs", "brain.ndjson")
+        since = _dt.date.today() - _dt.timedelta(days=days - 1)
+        total = 0.0
+        try:
+            for line in open(p, encoding="utf-8"):
+                try:
+                    rec = _j.loads(line)
+                except Exception:
+                    continue
+                day = rec.get("day") or ""
+                if not day or day < since.isoformat():
+                    continue
+                tk = rec.get("tokens") or {}
+                if tk.get("prompt_tokens") or tk.get("completion_tokens"):
+                    # 有真实 token 数就按「当前价 × token」重算，旧记录也能跟着现在的价走
+                    try:
+                        import brain_call as _bc
+                        _pin, _pout = _bc.PRICES.get(str(rec.get("provider") or "deepseek").lower(),
+                                                     _bc.DEFAULT_PRICE)
+                    except Exception:
+                        _pin, _pout = 2.0, 8.0
+                    total += int(tk.get("prompt_tokens") or 0) / 1e6 * _pin
+                    total += int(tk.get("completion_tokens") or 0) / 1e6 * _pout
+                else:
+                    total += float(rec.get("cost_cny") or 0)
+        except Exception:
+            pass
+        return round(total, 4)
 
     return {"ok": True, "calls": src["calls"], "prompt_tok": src["prompt_tok"],
             "out_tok": src["out_tok"], "cache_hit": None,
-            "cost": _cost(src["prompt_tok"], src["out_tok"]),
-            "cost_week": _cost(agg["prompt_tok"], agg["out_tok"]),
+            "cost": _cost_from_log(1),
+            "cost_week": _cost_from_log(7),
             "week": {"calls": agg["calls"], "prompt_tok": agg["prompt_tok"],
                      "out_tok": agg["out_tok"]},
             "avg_ms": int(src["ms"] / max(1, src["calls"]))}
