@@ -27,7 +27,7 @@ jobs:
         working-directory: desktop
         run: |
           python -m pip install --upgrade pip
-          python -m pip install --target engine/py/lib/site-packages requests qrcode pillow
+          python -m pip install --target engine/py/Lib/site-packages requests qrcode pillow
           $py = (Get-Command python).Source
           $root = Split-Path (Split-Path $py)
           Copy-Item -Recurse -Force $root engine/py
