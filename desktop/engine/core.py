@@ -4449,7 +4449,7 @@ def _cn_hour(tok: str) -> int:
 def extract_when(text: str) -> str:
     """从手机记的一句话里找出「哪天几点」，拼成 _trip_at 认识的写法。
 
-    「明天下午三点开会」→「明天 15:00」；「11-23 23:20 飞昆明」→ 原样。
+    「明天下午三点开会」→「明天 15:00」；「11-23 23:20 飞外地」→ 原样。
     """
     import re as _r2
     t = (text or "").strip()
