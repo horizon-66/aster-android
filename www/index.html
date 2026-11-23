@@ -86,6 +86,10 @@ footer{padding:0 26px 22px;font-size:11.5px;line-height:1.9;color:#A9A7A0;text-a
 #intro .start{flex:0 0 auto;opacity:0;animation:up .55s 1.55s ease forwards;margin-top:28px}
 #intro .back{flex:0 0 auto;opacity:0;animation:up .55s 1.7s ease forwards;
   text-align:center;margin-top:16px;font-size:12px;color:var(--dim)}
+
+.demoLink{display:block;text-align:center;margin:18px 0 6px;font-size:13px;
+  color:#8C8A84;text-decoration:none}
+.demoLink:active{color:#C2243C}
 </style></head><body>
 
 
@@ -121,11 +125,20 @@ footer{padding:0 26px 22px;font-size:11.5px;line-height:1.9;color:#A9A7A0;text-a
 
   <div class="hr"></div>
 
+  <div class="label">六位码</div>
+  <p class="hint">电脑上「设置 → 手机连接」显示的那六位数字，填进来就能连上。码十分钟内有效。</p>
+  <div class="field"><label>六位数字</label>
+    <input id="code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="off"></div>
+  <button class="btn ink" id="useCode">用这六位连上</button>
+
+  <div class="hr"></div>
+
   <div class="label">手动填写</div>
   <p class="hint">仅在无法扫描时使用。令牌可在电脑「设置 → 手机连接」的二维码下方取得；此处无须与电脑处于同一网络。</p>
   <div class="field"><label>电脑地址</label><input id="base" placeholder="https://aster.asternest.net" autocomplete="off" spellcheck="false"></div>
   <div class="field"><label>配对令牌</label><input id="token" placeholder="电脑设置页中显示的一串字符" autocomplete="off" spellcheck="false"></div>
   <button class="btn ink" id="go">保存并连接</button>
+  <a href="demo.html" class="demoLink">没有电脑？先看看体验版 ›</a>
   <div class="state"><span class="dot" id="dot"></span><span id="stateText">尚未连接</span></div>
 
   <div class="hr"></div>
@@ -136,7 +149,18 @@ footer{padding:0 26px 22px;font-size:11.5px;line-height:1.9;color:#A9A7A0;text-a
   <button class="btn line" id="saveKey">保存密钥</button>
 </main>
 
-<footer>记忆与情绪存于本机 · 不上传 · 可导出迁移</footer>
+<footer>记忆与情绪存于本机 · 不上传 · 可导出迁移<br>
+  <span id="replayIntro" style="color:#C2243C;margin-top:8px;display:inline-block">再看一遍开头</span>
+</footer>
+<script>
+  (function(){
+    const b = document.getElementById('replayIntro');
+    if (!b) return;
+    b.onclick = function(){
+      try { if (window.__showIntro) window.__showIntro(); } catch(e) {}
+    };
+  })();
+</script>
 <script>
 const $ = (s) => document.querySelector(s);
 const KEY = 'aster.remote';
@@ -150,11 +174,28 @@ function paint(state, text) {
 async function probe(base, token) {
   try {
     const ctl = new AbortController();
-    const to = setTimeout(() => ctl.abort(), 4000);
+    const to = setTimeout(() => ctl.abort(), 2500);
     const r = await fetch(base + '/health?t=' + encodeURIComponent(token), { signal: ctl.signal });
     clearTimeout(to);
     return r.ok;
   } catch (e) { return false; }
+}
+
+async function tryAutoGo(saved) {
+  if (!saved || !saved.base || !saved.token) return false;
+  paint('', '正在连接…');
+  for (let i = 0; i < 2; i++) {
+    const ok = await probe(saved.base, saved.token);
+    if (ok) {
+      paint('on', '已连接');
+      // 已经连上就别停在连接页
+      location.replace(saved.base + '/m?t=' + encodeURIComponent(saved.token));
+      return true;
+    }
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  paint('bad', '电脑没有响应，可继续离线记录');
+  return false;
 }
 
 (async function () {
@@ -162,10 +203,43 @@ async function probe(base, token) {
   if (saved && saved.base) {
     $('#base').value = saved.base;
     $('#token').value = saved.token || '';
-    paint('', '正在连接…');
-    const ok = await probe(saved.base, saved.token);
-    paint(ok ? 'on' : 'bad', ok ? '已连接' : '电脑没有响应，可继续离线记录');
+    if (await tryAutoGo(saved)) return;
   }
+  // 页面回到前台时再试一次：电脑可能刚开机
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      const s2 = JSON.parse(localStorage.getItem(KEY) || 'null');
+      if (s2 && s2.base) tryAutoGo(s2);
+    }
+  });
+  $('#useCode').onclick = async () => {
+    const base = (($('#base').value || 'https://aster.asternest.net') + '').trim().replace(/\/+$/, '');
+    const code = ($('#code').value || '').replace(/\D/g, '');
+    if (code.length !== 6) { paint('bad', '要填满六位数字'); return; }
+    paint('', '正在用这六位连…');
+    try {
+      const r = await fetch(base + '/pair/code/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code })
+      });
+      const d = await r.json();
+      if (d && d.ok && d.token) {
+        localStorage.setItem(KEY, JSON.stringify({ base, token: d.token }));
+        paint('on', '已连上');
+        location.href = base + '/m?t=' + encodeURIComponent(d.token);
+        return;
+      }
+      const why = (d && d.error) || 'unknown';
+      paint('bad', why === 'expired' ? '码过期了，让电脑再生成一个'
+        : why === 'mismatch' ? '这六位不对，看一眼电脑上显示的数字'
+        : why === 'locked' ? '试错次数太多，等一分钟再来'
+        : '没连上，确认电脑开着并且显示着这个码');
+    } catch (e) {
+      paint('bad', '连不上：确认电脑开着、网络是通的');
+    }
+  };
+
   $('#go').onclick = async () => {
     const base = ($('#base').value || '').trim().replace(/\/+$/, '');
     const token = ($('#token').value || '').trim();
@@ -270,7 +344,7 @@ async function probe(base, token) {
   })();
   // 让原生壳把状态栏/导航栏涂成与页面一致的深色
   (function(){
-    const sync = () => { try { if (window.AsterNative && window.AsterNative.apply) window.AsterNative.apply('light'); } catch(e){} };
+    const sync = () => { try { if (window.AsterBars && window.AsterBars.apply) window.AsterBars.apply('light'); } catch(e){} };
     sync(); setTimeout(sync, 400); setTimeout(sync, 1200);
   })();
 
@@ -278,8 +352,19 @@ async function probe(base, token) {
   (function(){
     const intro = document.getElementById('intro');
     if (!intro) return;
-    if (localStorage.getItem('aster.intro') === '1') intro.classList.add('gone');
-    const close = () => { intro.classList.add('gone'); localStorage.setItem('aster.intro', '1'); };
+    const VER = '4.0.7';
+    if (window.__ASTER_NATIVE_INTRO) intro.classList.add('gone');
+    if (localStorage.getItem('aster.intro') === '1' &&
+        localStorage.getItem('aster.introVer') === VER) intro.classList.add('gone');
+    window.__showIntro = function(){
+      intro.classList.remove('gone');
+      intro.scrollTop = 0;
+    };
+    const close = () => {
+      intro.classList.add('gone');
+      localStorage.setItem('aster.intro', '1');
+      localStorage.setItem('aster.introVer', '4.0.7');
+    };
     document.getElementById('startBtn').onclick = close;
     document.getElementById('skipBtn').onclick = close;
   })();
