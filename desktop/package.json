@@ -1,7 +1,7 @@
 {
   "name": "aster",
   "productName": "Aster",
-  "version": "4.0.5",
+  "version": "4.0.6",
   "description": "会记住你的桌面伙伴",
   "main": "main.js",
   "author": "Lamore",
