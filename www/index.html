@@ -1,74 +1,142 @@
 <!doctype html><html lang="zh"><head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#FBFAF7">
 <title>Aster</title>
+<link rel="icon" href="mark.png">
 <style>
-*{box-sizing:border-box}
-body{margin:0;min-height:100vh;background:#141418;color:#eee;
-  font:16px/1.7 -apple-system,"PingFang SC",sans-serif;display:flex;flex-direction:column}
-header{padding:22px 22px 6px}
-header h1{margin:0;font-size:19px;font-weight:600}
-header p{margin:8px 0 0;font-size:13px;color:#9a9aa2;line-height:1.8}
-main{padding:18px 22px 24px;display:flex;flex-direction:column;gap:14px}
-.card{background:#1b1b20;border:1px solid #26262d;border-radius:14px;padding:16px}
-.card h2{margin:0 0 4px;font-size:14px;font-weight:600}
-.card p{margin:0 0 12px;font-size:12.5px;color:#9a9aa2;line-height:1.8}
-label{display:block;font-size:12px;color:#9a9aa2;margin:10px 0 6px}
-input{width:100%;height:42px;border-radius:11px;border:1px solid #333;background:#232329;
-  color:#eee;padding:0 12px;font-size:14px;outline:none}
-input:focus{border-color:#e8173d}
-.row{display:flex;gap:10px;margin-top:14px}
-button{flex:1;height:42px;border-radius:11px;border:0;font-size:14px;cursor:pointer}
-.primary{background:#e8173d;color:#fff}
-.ghost{background:none;border:1px solid #333;color:#bbb}
-.state{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#9a9aa2;margin-top:12px}
-.dot{width:8px;height:8px;border-radius:50%;background:#555}
-.dot.on{background:#5aa87a}
-.dot.bad{background:#e8173d}
-.note{font-size:12px;color:#77777f;line-height:1.8;padding:0 4px}
-footer{margin-top:auto;padding:16px 22px 26px;font-size:11.5px;color:#5f5f68;line-height:1.8}
+:root{
+  --bg:#FBFAF7; --card:#FFFFFF; --ink:#101014; --ink2:#3A3A42; --dim:#8A8A92;
+  --line:#EAE7E0; --fill:#F4F2EC; --red:#C2243C;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{background:var(--bg)}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);
+  font:15px/1.75 -apple-system,"PingFang SC","Helvetica Neue",sans-serif;
+  padding-top:env(safe-area-inset-top);padding-bottom:calc(env(safe-area-inset-bottom) + 8px);
+  display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+
+/* —— 通用 —— */
+.label{font-size:11px;letter-spacing:.2em;color:var(--dim);margin:0 0 10px}
+.hint{margin:0 0 14px;font-size:12.5px;line-height:1.95;color:var(--dim)}
+.hr{height:1px;background:var(--line);margin:26px 0}
+.btn{display:block;width:100%;height:50px;border:0;border-radius:14px;font-size:15px;font-weight:600;
+  letter-spacing:.02em;cursor:pointer;transition:transform .12s ease,opacity .12s ease}
+.btn:active{transform:scale(.99);opacity:.9}
+.btn.ink{background:var(--ink);color:#fff}
+.btn.line{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:500}
+.btn.red{background:var(--red);color:#fff}
+
+/* —— 表单 —— */
+.field{margin:0 0 18px}
+.field label{display:block;font-size:11px;letter-spacing:.16em;color:var(--dim);margin:0 0 8px}
+.field input{width:100%;height:50px;border:0;border-radius:12px;background:var(--fill);
+  color:var(--ink);padding:0 15px;font-size:15px;outline:none;transition:background .15s ease,box-shadow .15s ease}
+.field input::placeholder{color:#A9A7A0}
+.field input:focus{background:#fff;box-shadow:0 0 0 1.5px var(--ink) inset}
+
+.state{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--dim);margin-top:14px}
+.dot{width:6px;height:6px;border-radius:50%;background:#C9C6BE}
+.dot.on{background:#3F8F63}
+.dot.bad{background:var(--red)}
+
+/* —— 头部 —— */
+header{padding:40px 26px 26px;text-align:left}
+header h1{margin:0 0 10px;font-size:26px;font-weight:600;letter-spacing:-.02em}
+header p{margin:0;font-size:13px;line-height:1.95;color:var(--dim);max-width:22em}
+
+main{flex:1;padding:0 26px 30px}
+footer{padding:0 26px 22px;font-size:11.5px;line-height:1.9;color:#A9A7A0;text-align:center}
+
+
+/* —— 开场动画：人物 → 压成一条线 → 展开成字 —— */
+#splash{position:fixed;inset:0;background:var(--bg);z-index:80;overflow:hidden;
+  transition:opacity .5s ease, visibility .5s ease}
+#splash.gone{opacity:0;visibility:hidden;pointer-events:none}
+#splash .hero,#splash .line,#splash .word{position:absolute;left:50%;top:50%;
+  transform:translate(-50%,-50%);will-change:transform,opacity}
+#splash .hero{width:132px;height:132px;opacity:0}
+#splash .line{width:132px;height:2px;background:var(--red);opacity:0;border-radius:1px}
+#splash .word{display:flex;gap:.34em;font-size:15px;letter-spacing:.42em;
+  color:var(--ink);text-transform:uppercase;font-weight:500;
+  transform:translate(-50%,-50%) translateY(-20px);opacity:0;margin-left:.42em}
+/* —— 起始说明 —— */
+#intro{position:fixed;inset:0;background:var(--bg);z-index:50;display:flex;flex-direction:column;
+  overflow-y:auto;padding:calc(56px + env(safe-area-inset-top)) 26px calc(22px + env(safe-area-inset-bottom))}
+#intro.gone{opacity:0;transform:scale(1.01);pointer-events:none;transition:opacity .4s ease,transform .4s ease}
+#intro h1{flex:0 0 auto;opacity:0;animation:up .6s .25s ease forwards;
+  margin:0 0 12px;font-size:30px;font-weight:600;text-align:center;letter-spacing:-.01em}
+#intro .sub{flex:0 0 auto;opacity:0;animation:up .6s .42s ease forwards;
+  margin:0 0 24px;color:var(--dim);font-size:13px;line-height:1.95;text-align:center}
+#intro .illu{flex:0 0 auto;width:82%;max-width:320px;margin:0 auto 22px;display:block;
+  opacity:0;transform:scale(1.03);animation:settle .9s .75s cubic-bezier(.22,.7,.3,1) forwards}
+@keyframes settle{to{opacity:1;transform:scale(1)}}
+@keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+#intro ol{margin:0 0 auto;padding:0;list-style:none;display:flex;flex-direction:column;gap:15px}
+#intro li{display:flex;gap:14px;align-items:flex-start;opacity:0;transform:translateY(8px);
+  animation:up .55s ease forwards}
+#intro li:nth-child(1){animation-delay:1.05s}
+#intro li:nth-child(2){animation-delay:1.2s}
+#intro li:nth-child(3){animation-delay:1.35s}
+#intro li .n{flex:0 0 22px;height:22px;border-radius:50%;border:1px solid var(--line);
+  color:var(--dim);font-size:11px;display:grid;place-items:center;margin-top:2px}
+#intro li p{margin:0;font-size:13.5px;color:var(--ink2);line-height:1.8}
+#intro li p b{display:block;color:var(--ink);font-weight:600;font-size:14px;margin-bottom:2px}
+#intro .start{flex:0 0 auto;opacity:0;animation:up .55s 1.55s ease forwards;margin-top:28px}
+#intro .back{flex:0 0 auto;opacity:0;animation:up .55s 1.7s ease forwards;
+  text-align:center;margin-top:16px;font-size:12px;color:var(--dim)}
 </style></head><body>
+
+
+<div id="splash">
+  <img class="hero" src="hello.png" alt="">
+  <div class="line"></div>
+  <div class="word"><span>A</span><span>S</span><span>T</span><span>E</span><span>R</span></div>
+</div>
+</div>
+
+<div id="intro">
+  <h1>Aster</h1>
+  <p class="sub">Ta运行于你的电脑。<br>手机不保存记忆，仅作为连接本机界面的一扇窗。</p>
+  <img class="illu" src="aster-3d.png" alt="">
+  <ol>
+    <li><span class="n">1</span><p><b>在电脑上打开 Aster</b>依次进入「设置 → 手机连接」，可取得配对二维码。</p></li>
+    <li><span class="n">2</span><p><b>在手机上扫描二维码</b>扫描完成后，地址与令牌将自动填入；若无法扫描，可在下方手动输入。</p></li>
+    <li><span class="n">3</span><p><b>点击「保存并连接」</b>此后即可查看对话、日程与记忆，与电脑端保持一致。</p></li>
+  </ol>
+  <button class="btn ink start" id="startBtn">开始连接</button>
+  <div class="back" id="skipBtn">此前已建立连接，直接进入</div>
+</div>
+
 <header>
-  <h1>连接家里那台电脑</h1>
-  <p>她住在你的电脑上——记忆、性格、日程都在那里。手机只是窗口。</p>
+  <h1>连接你的电脑</h1>
+  <p>记忆、性格与日程都保存在电脑上。<br>手机不复存这些，它只是连过去的一扇窗。</p>
 </header>
 
 <main>
-  <div class="card">
-    <h2>扫码连接</h2>
-    <p>在电脑上打开「设置 → 配对 → 检测私有网络」，用手机相机扫那个二维码，地址会自动填好。</p>
-    <div class="row">
-      <button class="ghost" id="scan">打开相机扫码</button>
-    </div>
-  </div>
+  <div class="label">扫码连接</div>
+  <p class="hint">在电脑「设置 → 手机连接」中打开二维码，用相机扫描即可完成配对，地址与令牌会自动填入。</p>
+  <button class="btn line" id="scan">打开相机扫码</button>
 
-  <div class="card">
-    <h2>手动填写</h2>
-    <p>扫码不方便时，把这台电脑的地址和配对令牌填进来。两台设备需在同一私有网络内。</p>
-    <label>电脑地址</label>
-    <input id="base" placeholder="http://100.101.102.103:8777">
-    <label>配对令牌</label>
-    <input id="token" placeholder="设置页「配对」里那一串">
-    <div class="row">
-      <button class="primary" id="go">保存并连接</button>
-    </div>
-    <div class="state"><span class="dot" id="dot"></span><span id="stateText">尚未连接</span></div>
-  </div>
+  <div class="hr"></div>
 
-  <div class="card">
-    <h2>离线时也能说话（可选）</h2>
-    <p>留空也可以：电脑关着时只能记事。填了云端密钥，手机不连电脑也能自己回话，用的还是缓存下来的记忆与性格。</p>
-    <label>云端密钥</label>
-    <input id="key" type="password" placeholder="sk-…（只存在这台手机上）">
-    <div class="row"><button class="ghost" id="saveKey">保存密钥</button></div>
-  </div>
+  <div class="label">手动填写</div>
+  <p class="hint">仅在无法扫描时使用。令牌可在电脑「设置 → 手机连接」的二维码下方取得；此处无须与电脑处于同一网络。</p>
+  <div class="field"><label>电脑地址</label><input id="base" placeholder="https://aster.asternest.net" autocomplete="off" spellcheck="false"></div>
+  <div class="field"><label>配对令牌</label><input id="token" placeholder="电脑设置页中显示的一串字符" autocomplete="off" spellcheck="false"></div>
+  <button class="btn ink" id="go">保存并连接</button>
+  <div class="state"><span class="dot" id="dot"></span><span id="stateText">尚未连接</span></div>
 
-  <p class="note">连不上也能用：写下的内容会先存在手机里，回到同一网络后自动上传，并整理成日程与待办。</p>
+  <div class="hr"></div>
+
+  <div class="label">离线使用（可选）</div>
+  <p class="hint">留空亦可使用：电脑关闭时只能记事。填入云端密钥后，手机可依据缓存下来的记忆与性格自行应答。</p>
+  <div class="field"><label>云端密钥</label><input id="key" type="password" placeholder="sk-…" autocomplete="off"></div>
+  <button class="btn line" id="saveKey">保存密钥</button>
 </main>
 
-<footer>Aster · 一处数字个体的栖息之所</footer>
-
+<footer>记忆与情绪存于本机 · 不上传 · 可导出迁移</footer>
 <script>
 const $ = (s) => document.querySelector(s);
 const KEY = 'aster.remote';
@@ -120,8 +188,100 @@ async function probe(base, token) {
     paint('', k ? '密钥已保存，离线时可用于生成回复' : '已清除密钥，离线时只能记事');
   };
   $('#scan').onclick = () => {
-    paint('', '扫码需要相机权限；扫码后地址会自动填入上方输入框');
+    if (window.__ASTER_NATIVE === 'harmony') {
+      // 交给原生壳开系统扫码；结果会回调 window.__onScan
+      location.href = 'aster-scan:start';
+      return;
+    }
+    paint('', '这个环境没有系统扫码，请手动填写地址与令牌');
+  };
+  // 原生壳把扫码结果交回来：从链接里拆出地址与令牌
+  window.__onScan = function (text) {
+    // 扫到的可能带引号、换行，也可能没有协议头；都尽量认出来
+    let raw = String(text || '').trim().replace(/^["'\s]+|["'\s]+$/g, '');
+    let m = raw.match(/https?:\/\/[^\s]+/i);
+    let base = m ? m[0] : raw;
+    let t = '';
+    const tm = base.match(/[?&]t=([A-Za-z0-9]+)/);
+    if (tm) t = tm[1];
+    try {
+      const u = new URL(base);
+      $('#base').value = u.origin;
+      if (!t) t = u.searchParams.get('t') || '';
+      if (t) $('#token').value = t;
+      if (t) {
+        paint('ok', '已识别，正在连接…');
+        const _g = $('#go'); if (_g) setTimeout(function(){ _g.click(); }, 250);
+      } else {
+        paint('', '二维码里没有令牌，请让电脑重新生成');
+      }
+    } catch (e) {
+      paint('', '没认出二维码内容：' + String(text).slice(0, 60));
+    }
   };
 })();
+
+
+  // 开场：人物出现 → 压成一条线 → 线展开、字浮现 → 退场
+  (function(){
+    const sp = document.getElementById('splash');
+    if (!sp) return;
+    const hero = sp.querySelector('.hero');
+    const line = sp.querySelector('.line');
+    const word = sp.querySelector('.word');
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const done = function(){
+      sp.classList.add('gone');
+      setTimeout(function(){ sp.remove(); }, 550);
+    };
+    if (reduce || !hero || !hero.animate) { setTimeout(done, 400); return; }
+
+    const E = 'cubic-bezier(.22,.7,.3,1)';
+    const S = 'cubic-bezier(.7,.02,.9,.3)';
+    // 1) 人物淡入
+    hero.animate([
+      { opacity: 0, transform: 'translate(-50%,-50%) scale(.94)' },
+      { opacity: 1, transform: 'translate(-50%,-50%) scale(1)' }
+    ], { duration: 420, delay: 60, easing: E, fill: 'both' });
+    // 2) 人物被压成一条线（纵向收扁、横向略撑，然后隐去）
+    hero.animate([
+      { opacity: 1, transform: 'translate(-50%,-50%) scale(1,1)' },
+      { opacity: 1, transform: 'translate(-50%,-50%) scale(1.06,.10)', offset: .72 },
+      { opacity: 0, transform: 'translate(-50%,-50%) scale(1.06,.015)' }
+    ], { duration: 300, delay: 520, easing: S, fill: 'both' });
+    // 3) 线从压扁处出现
+    line.animate([
+      { opacity: 0, transform: 'translate(-50%,-50%) scaleX(.35)' },
+      { opacity: 1, transform: 'translate(-50%,-50%) scaleX(1)' }
+    ], { duration: 220, delay: 700, easing: E, fill: 'both' });
+    // 4) 线展开又收回，作为字的基线
+    line.animate([
+      { transform: 'translate(-50%,-50%) scaleX(1)' },
+      { transform: 'translate(-50%,-50%) scaleX(1.95)', offset: .55 },
+      { transform: 'translate(-50%,-50%) scaleX(.56)' }
+    ], { duration: 760, delay: 900, easing: E, fill: 'both' });
+    // 5) 字母浮现
+    word.animate([
+      { opacity: 0, transform: 'translate(-50%,-50%) translateY(-8px)' },
+      { opacity: 1, transform: 'translate(-50%,-50%) translateY(-20px)' }
+    ], { duration: 460, delay: 1120, easing: E, fill: 'both' });
+    // 6) 退场
+    setTimeout(done, 2050);
+  })();
+  // 让原生壳把状态栏/导航栏涂成与页面一致的深色
+  (function(){
+    const sync = () => { try { if (window.AsterNative && window.AsterNative.apply) window.AsterNative.apply('light'); } catch(e){} };
+    sync(); setTimeout(sync, 400); setTimeout(sync, 1200);
+  })();
+
+  // 起始说明页：第一次打开先讲清楚这是什么，之后不再拦
+  (function(){
+    const intro = document.getElementById('intro');
+    if (!intro) return;
+    if (localStorage.getItem('aster.intro') === '1') intro.classList.add('gone');
+    const close = () => { intro.classList.add('gone'); localStorage.setItem('aster.intro', '1'); };
+    document.getElementById('startBtn').onclick = close;
+    document.getElementById('skipBtn').onclick = close;
+  })();
 </script>
 </body></html>
