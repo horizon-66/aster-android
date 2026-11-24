@@ -491,8 +491,12 @@ body[data-theme="dark"] .picB img{background:#1E1E22}
 body[data-theme="dark"] .miniBtn{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.12);color:#F3F1EA}
 .aiTag{text-align:center;font-size:10.5px;color:#B3B0A8;margin-bottom:6px;letter-spacing:.02em}
 body[data-theme="dark"] .aiTag{color:rgba(243,241,234,.35)}
-.demoBar{position:fixed;left:0;right:0;bottom:0;z-index:70;text-align:center;
-  font-size:11px;color:#8C8A84;background:rgba(251,250,246,.94);padding:6px 0 calc(6px + env(safe-area-inset-bottom))}
+.demoBar{position:fixed;left:0;right:0;bottom:0;z-index:70;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  font-size:11px;color:#8C8A84;background:rgba(251,250,246,.94);padding:6px 14px calc(6px + env(safe-area-inset-bottom))}
+.demoBar a{color:#C2243C;text-decoration:none;font-weight:600;
+  border:1px solid rgba(194,36,60,.35);border-radius:12px;padding:3px 10px}
+.demoBar a:active{background:rgba(194,36,60,.08)}
 body{padding-bottom:28px}
 </style>
 <script>
@@ -557,6 +561,9 @@ body{padding-bottom:28px}
   // 实时通道在演示里不需要
   try { window.EventSource = function(){ return {close:function(){}, onerror:null, onmessage:null}; }; } catch(e) {}
   window.__DEMO_MODE__ = true;
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') location.href = 'index.html';
+  });
   document.addEventListener('DOMContentLoaded', function(){
     setTimeout(function(){
       var m = document.querySelector('header span, header .st, header p');
@@ -568,7 +575,7 @@ body{padding-bottom:28px}
 })();
 </script>
 </head><body>
-<div class="demoBar">演示模式 · 示例数据，不连电脑</div>
+<div class="demoBar"><span>演示模式 · 示例数据，不连电脑</span><a href="index.html" id="exitDemo">退出演示</a></div>
 
 <header>
  <button id="fabMenu" aria-label="菜单">
