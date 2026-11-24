@@ -267,7 +267,16 @@ async function tryAutoGo(saved) {
       location.href = 'aster-scan:start';
       return;
     }
-    paint('', '这个环境没有系统扫码，请手动填写地址与令牌');
+    window.__startScan((text) => {
+      try {
+        const u = new URL(text.trim());
+        const t = u.searchParams.get('t') || '';
+        if (!t) { paint('bad', '这个码里没有配对令牌'); return; }
+        localStorage.setItem(KEY, JSON.stringify({ base: u.origin, token: t }));
+        paint('on', '扫到了，正在连…');
+        location.href = u.origin + '/m?t=' + encodeURIComponent(t);
+      } catch (e) { paint('bad', '这个码不是 Aster 的'); }
+    });
   };
   // 原生壳把扫码结果交回来：从链接里拆出地址与令牌
   window.__onScan = function (text) {
@@ -368,5 +377,58 @@ async function tryAutoGo(saved) {
     document.getElementById('startBtn').onclick = close;
     document.getElementById('skipBtn').onclick = close;
   })();
+</script>
+<div id="scanWrap" style="display:none;position:fixed;inset:0;z-index:9999;background:#000">
+  <video id="scanVideo" playsinline muted style="width:100%;height:100%;object-fit:cover"></video>
+  <div style="position:absolute;inset:0;display:grid;place-items:center;pointer-events:none">
+    <div style="width:min(64vw,260px);aspect-ratio:1;border:2px solid rgba(255,255,255,.9);border-radius:18px;
+                box-shadow:0 0 0 9999px rgba(0,0,0,.35)"></div>
+  </div>
+  <div style="position:absolute;left:0;right:0;bottom:calc(28px + env(safe-area-inset-bottom));text-align:center;color:#fff;
+              font:13px/1.6 -apple-system,system-ui,sans-serif">
+    <div id="scanHint">把电脑上的二维码放进框里</div>
+    <button id="scanCancel" style="margin-top:12px;background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.4);
+            border-radius:16px;padding:8px 18px;font-size:13px">取消</button>
+  </div>
+</div>
+<script src="jsQR.js"></script>
+<script>
+window.__startScan = function(done){
+  var wrap = document.getElementById('scanWrap');
+  var video = document.getElementById('scanVideo');
+  var hint = document.getElementById('scanHint');
+  var stream = null, raf = 0, canvas = document.createElement('canvas'), ctx = canvas.getContext('2d', {willReadFrequently:true});
+  function stop(){
+    cancelAnimationFrame(raf);
+    if (stream) stream.getTracks().forEach(function(t){ t.stop(); });
+    wrap.style.display = 'none';
+  }
+  document.getElementById('scanCancel').onclick = stop;
+  wrap.style.display = 'block';
+  hint.textContent = '正在打开相机…';
+  navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}, audio:false})
+    .then(function(s){
+      stream = s; video.srcObject = s; video.play();
+      hint.textContent = '把电脑上的二维码放进框里';
+      tick();
+    })
+    .catch(function(e){ hint.textContent = '打不开相机：' + (e && e.name ? e.name : '被拒绝'); });
+
+  function tick(){
+    raf = requestAnimationFrame(tick);
+    if (video.readyState !== 4 || !video.videoWidth) return;
+    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    var img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    if (!window.jsQR) return;
+    var code = window.jsQR(img.data, img.width, img.height, {inversionAttempts:'dontInvert'});
+    if (code && code.data) {
+      stop();
+      if (navigator.vibrate) navigator.vibrate(40);
+      done(code.data);
+    }
+  }
+  return stop;
+};
 </script>
 </body></html>
