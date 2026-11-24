@@ -212,20 +212,40 @@ async function tryAutoGo(saved) {
       if (s2 && s2.base) tryAutoGo(s2);
     }
   });
+  // 六位码：地址按「手填 → 上次的局域网 → 上次用的 → 隧道」挨个试
   $('#useCode').onclick = async () => {
-    const base = (($('#base').value || 'https://aster.asternest.net') + '').trim().replace(/\/+$/, '');
     const code = ($('#code').value || '').replace(/\D/g, '');
     if (code.length !== 6) { paint('bad', '要填满六位数字'); return; }
+    const typed = ($('#base').value || '').trim();
+    let mem = {};
+    try { mem = JSON.parse(localStorage.getItem(KEY) || 'null') || {}; } catch (e) { mem = {}; }
+    const cands = [];
+    const push = (u) => {
+      u = (u || '').trim().replace(/\/+$/, '');
+      if (u && cands.indexOf(u) < 0) cands.push(u);
+    };
+    push(typed); push(mem.lan); push(mem.base); push(mem.net); push('https://aster.asternest.net');
     paint('', '正在用这六位连…');
-    try {
-      const r = await fetch(base + '/pair/code/claim', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code })
-      });
-      const d = await r.json();
+    for (let i = 0; i < cands.length; i++) {
+      const base = cands[i];
+      let d = null;
+      try {
+        const ctl = new AbortController();
+        const to = setTimeout(() => ctl.abort(), 4000);
+        const r = await fetch(base + '/pair/code/claim', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code }),
+          signal: ctl.signal
+        });
+        clearTimeout(to);
+        d = await r.json();
+      } catch (e) {
+        continue;
+      }
       if (d && d.ok && d.token) {
-        localStorage.setItem(KEY, JSON.stringify({ base, token: d.token }));
+        try { $('#base').value = base; } catch (e) {}
+        localStorage.setItem(KEY, JSON.stringify({ base, token: d.token, lan: mem.lan || '', net: mem.net || '' }));
         paint('on', '已连上');
         location.href = base + '/m?t=' + encodeURIComponent(d.token);
         return;
@@ -235,9 +255,9 @@ async function tryAutoGo(saved) {
         : why === 'mismatch' ? '这六位不对，看一眼电脑上显示的数字'
         : why === 'locked' ? '试错次数太多，等一分钟再来'
         : '没连上，确认电脑开着并且显示着这个码');
-    } catch (e) {
-      paint('bad', '连不上：确认电脑开着、网络是通的');
+      return;
     }
+    paint('bad', '这台设备够不着电脑。同一 Wi-Fi 下直接扫码最快；不同网络就在「电脑地址」里填电脑上显示的那个地址');
   };
 
   $('#go').onclick = async () => {
